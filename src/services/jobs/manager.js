@@ -1,14 +1,14 @@
 const db = require('../../config/db');
 const { jobQueue, addJob } = require('../queue');
 const { creditLedgerService } = require('../credits/ledger');
-const { getProvider } = require('../providers/index');
+const { getProvider, activeProvider } = require('../providers/index');
 
 class JobManagerService {
     async createJob(userId, mediaType, userParams, templateId = null) {
         const client = await db.pool.connect();
 
         // 1. Estimate Cost
-        const providerName = process.env.AI_PROVIDER || 'mock'; // Or logic based on mediaType
+        const providerName = activeProvider; // Uses the environment variable or defaults to 'kie'
         const provider = getProvider(providerName);
         const estimatedCost = await provider.estimate_cost({ mediaType, ...userParams });
 
