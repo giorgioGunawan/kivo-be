@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kivo AI | Admin Dashboard</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --radius: 12px;
+            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+
+        /* --- Login Overlay --- */
+        #loginOverlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .login-card {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: var(--shadow-lg);
+            text-align: center;
+        }
+
+        .login-card h1 {
+            margin-bottom: 8px;
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .login-card p {
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+
+        /* --- Layout --- */
+        #mainApp {
+            display: none;
+            /* Hidden by default until login */
+            max-width: 1400px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 40px 20px;
+            overflow-x: hidden;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .badge {
+            background: #dbeafe;
+            color: var(--primary);
+            font-size: 12px;
+            padding: 4px 12px;
+            border-radius: 99px;
+            font-weight: 600;
+        }
+
+        /* --- Tabs --- */
+        .tabs {
+            display: flex;
+            gap: 8px;
+            background: #f1f5f9;
+            padding: 6px;
+            border-radius: 12px;
+            margin-bottom: 32px;
+            width: fit-content;
+            overflow-x: auto;
+            max-width: 100%;
+        }
+
+        .tab {
+            padding: 8px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            color: var(--text-muted);
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .tab.active {
+            background: white;
+            color: var(--primary);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        /* --- Panes --- */
+        .pane {
+            display: none;
+        }
+
+        .pane.active {
+            display: grid;
+        }
+
+        #simulatorPane {
+            grid-template-columns: minmax(300px, 380px) 1fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 1100px) {
+            #simulatorPane {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                order: 2;
+            }
+
+            .logs-container {
+                order: 1;
+                height: 500px;
+            }
+        }
+
+        #databasePane {
+            grid-template-columns: 1fr;
+            width: 100%;
+        }
+
+        /* --- UI Elements --- */
+        .sidebar {
+            width: 100%;
+            min-width: 0;
+        }
+
+        .card {
+            background: white;
+            border-radius: var(--radius);
+            padding: 24px;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+        }
+
+        .card-header {
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .card-header h3 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            color: var(--text-muted);
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            margin-bottom: 20px;
+            outline: none;
+            transition: border-color 0.2s;
+            font-size: 14px;
+        }
+
+        input:focus {
+            border-color: var(--primary);
+        }
+
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: var(--primary-hover);
+        }
+
+        button.secondary {
+            background: #f1f5f9;
+            color: var(--text-main);
+        }
+
+        button.secondary:hover {
+            background: #e2e8f0;
+        }
+
+        /* --- Logs Panel --- */
+        .logs-container {
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 250px);
+        }
+
+        #output {
+            flex-grow: 1;
+            overflow-y: auto;
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            font-family: 'Inter', -apple-system, sans-serif;
+            font-size: 14px;
+            max-width: 100%;
+            word-break: break-word;
+        }
+
+        .log-entry {
+            margin-bottom: 16px;
+            border-bottom: 1px solid #edf2f7;
+            padding-bottom: 12px;
+        }
+
+        .log-timestamp {
+            color: var(--text-muted);
+            font-size: 11px;
+            margin-bottom: 4px;
+        }
+
+        /* --- Table View --- */
+        .table-browser {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .table-controls {
+            display: flex;
+            gap: 16px;
+            align-items: flex-end;
+            background: white;
+            padding: 24px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+        }
+
+        .table-controls>div {
+            flex-grow: 0;
+            min-width: 200px;
+        }
+
+        .table-scroll {
+            overflow-x: auto;
+            background: white;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        th {
+            background: #f1f5f9;
+            text-align: left;
+            padding: 12px 16px;
+            font-weight: 600;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #f1f5f9;
+            color: var(--text-main);
+        }
+
+        tr:hover td {
+            background-color: #f8fafc;
+        }
+
+        /* Media */
+        .media-thumb {
+            width: 80px;
+            height: 80px;
+            object-fit: cover;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+        }
+
+        video {
+            outline: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="loginOverlay">
+        <div class="login-card">
+            <h1>Kivo Admin</h1>
+            <p>Please enter the administrator password</p>
+            <input type="password" id="entryPassword" placeholder="Password" style="text-align:center" />
+            <button onclick="checkAdminLogin()" style="width:100%">Enter Dashboard</button>
+            <div id="loginError" style="color:#ef4444; margin-top:10px; font-size:14px; display:none">Incorrect Password
+            </div>
+        </div>
+    </div>
+
+    <div id="mainApp">
+        <header>
+            <div class="logo">
+                ✨ Kivo AI <span class="badge">PRO</span>
+            </div>
+            <div id="userInfo" style="font-size: 14px; color: var(--text-muted)">Not logged in</div>
+        </header>
+
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('simulator')">Simulator & Logs</div>
+            <div class="tab" onclick="switchTab('database')">Database Browser</div>
+        </div>
+
+        <!-- Simulator Pane -->
+        <div id="simulatorPane" class="pane active">
+            <div class="sidebar">
+                <!-- Auth Card -->
+                <div class="card" style="margin-bottom: 24px;">
+                    <div class="card-header">
+                        <h3>🔑 Session</h3>
+                    </div>
+                    <label>User JWT Token</label>
+                    <input type="text" id="userToken" placeholder="Auto-fills on login" />
+                    <button class="secondary" onclick="loginMockUser()" style="width:100%">Login as Mock User</button>
+                </div>
+
+                <!-- Simulation Tools -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>🧪 Simulation</h3>
+                    </div>
+                    <label>Action</label>
+                    <select id="actionSelect" onchange="updateForm()">
+                        <optgroup label="User Simulation">
+                            <option value="getBalance">💳 Check My Balance</option>
+                            <option value="createJob" selected>🎨 Create New Generation</option>
+                            <option value="getJob">👀 Check Job Status</option>
+                            <option value="getLedger">📜 View History</option>
+                            <option value="verifySub">✅ Verify Subscription</option>
+                        </optgroup>
+                        <optgroup label="Admin Tools">
+                            <option value="addCredits">💰 Give Free Credits</option>
+                            <option value="getParams">⚙️ System Settings</option>
+                            <option value="setParams">✏️ Change Settings</option>
+                        </optgroup>
+                    </select>
+
+                    <div id="actionDescription"
+                        style="font-size: 13px; color: var(--text-muted); padding: 10px; background: #f8fafc; border-radius: 8px; margin-bottom: 20px;">
+                        Loading...
+                    </div>
+
+                    <div id="formContainer"></div>
+
+                    <button onclick="executeAction()" style="width:100%">Run Request</button>
+                </div>
+            </div>
+
+            <div class="card logs-container">
+                <div class="card-header">
+                    <h3>📜 Console Logs</h3>
+                    <button class="secondary" style="padding: 5px 15px; font-size: 12px;" onclick="clearLogs()">Clear
+                        Logs</button>
+                </div>
+                <div id="output">
+                    <div style="color: #64748b; font-style: italic;">Wait for activity...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Database Pane -->
+        <div id="databasePane" class="pane">
+            <div class="table-browser">
+                <div class="table-controls">
+                    <div>
+                        <label>Select Table</label>
+                        <select id="dbTableSelect" style="margin-bottom:0">
+                            <option value="users">Users</option>
+                            <option value="credit_balances">Balances</option>
+                            <option value="credit_ledger">Ledger (Activity)</option>
+                            <option value="jobs" selected>Jobs</option>
+                            <option value="subscriptions">Subscriptions</option>
+                            <option value="idempotency_keys">Idempotency Keys</option>
+                            <option value="admin_config">Config</option>
+                            <option value="external_events">External Events</option>
+                        </select>
+                    </div>
+                    <button onclick="viewTable()" style="height:42px">🔄 Refresh Data</button>
+                </div>
+
+                <div class="card table-view" style="padding:0; overflow:hidden;">
+                    <div class="table-scroll" id="dbOutput">
+                        <div style="padding:40px; text-align:center; color: var(--text-muted)">Click refresh to load
+                            data</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.origin;
+        let adminPassword = '';
+
+        // --- Auth Gateway ---
+        function checkAdminLogin() {
+            const passInput = document.getElementById('entryPassword');
+            const password = passInput.value;
+
+            // For MVP we just use it. In a real app we'd verify with a ping.
+            adminPassword = password;
+
+            // Visual feedback
+            document.getElementById('loginOverlay').style.display = 'none';
+            document.getElementById('mainApp').style.display = 'block';
+
+            // Try to load initial data
+            updateForm();
+            viewTable();
+        }
+
+        // --- Tabs ---
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
+
+            event.target.classList.add('active');
+            document.getElementById(`${tabId}Pane`).classList.add('active');
+        }
+
+        // --- Application State ---
+        let currentUser = null;
+
+        async function loginMockUser() {
+            log('Logging in mock user...');
+            try {
+                const res = await fetch(`${API_URL}/auth/apple`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ identityToken: 'mock_token' })
+                });
+                const data = await res.json();
+                if (data.token) {
+                    document.getElementById('userToken').value = data.token;
+                    currentUser = data.user;
+                    document.getElementById('userInfo').textContent = `Logged in: User ID ${data.user.id}`;
+                    log('Login Successful!', data);
+                } else {
+                    log('Login Failed', data);
+                }
+            } catch (e) {
+                log('Error logging in', e);
+            }
+        }
+
+        // --- Forms Setup ---
+        const forms = {
+            getParams: '',
+            setParams: `
+                <label>Key</label><input type="text" id="configKey" placeholder="e.g. weekly_allocation">
+                <label>Value (JSON)</label><input type="text" id="configValue" placeholder="e.g. 1000">
+            `,
+            addCredits: `
+                <label>User ID</label><input type="text" id="creditUserId" placeholder="User ID">
+                <label>Amount</label><input type="number" id="creditAmount" value="500">
+                <label>Pool</label>
+                <select id="creditPool">
+                    <option value="weekly">Weekly</option>
+                    <option value="purchased">Purchased</option>
+                </select>
+            `,
+            createJob: `
+                <label>Media Type</label>
+                <select id="jobMetaType">
+                    <option value="image">Image</option>
+                    <option value="video">Video</option>
+                </select>
+                
+                <label>Input Image URL (Optional)</label>
+                <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+                    <input type="text" id="jobInputImage" placeholder="https://..." style="margin-bottom:0" />
+                    <input type="file" id="imageUpload" style="display: none;" onchange="uploadFile()" />
+                    <button class="secondary" onclick="document.getElementById('imageUpload').click()" style="padding:0 15px">📤</button>
+                    <span id="uploadStatus" style="font-size: 11px; align-self: center;"></span>
+                </div>
+
+                <label>Model (Optional)</label>
+                <select id="jobModel">
+                    <option value="">Default (Auto)</option>
+                    <option value="grok-imagine/text-to-image">Grok Imagine (Text-to-Image)</option>
+                    <option value="grok-imagine/image-to-image">Grok Imagine (Image-to-Image)</option>
+                    <option value="kling-v1">Kling v1 (Video/Image Edit)</option>
+                    <option value="flux-pro/v1.1">Flux Pro 1.1</option>
+                </select>
+
+                <label>Prompt</label>
+                <textarea id="jobParams" rows="3">A futuristic city</textarea>
+                
+                <div id="pollingIndicator" style="display:none; margin-top:10px; font-size:12px; color:var(--primary); font-weight:600;">
+                    ⏳ Polling for result...
+                </div>
+            `,
+            getBalance: '',
+            getLedger: '',
+            getJob: `<label>Job ID</label><input type="text" id="jobId" placeholder="Job ID">`,
+            verifySub: `<label>Transaction ID</label><input type="text" id="subTxId" value="1000000">`
+        };
+
+        const actionDescriptions = {
+            getParams: "Fetch current system configuration constants.",
+            setParams: "Overwrite a configuration key in the database.",
+            addCredits: "Force-add credits to a specific user (ledger entry created).",
+            createJob: "Simulate a user creating a new AI job. It will auto-poll for the result!",
+            getBalance: "Get the credit balance for the authenticated simulation user.",
+            getLedger: "See the full history of credit transactions for the user.",
+            getJob: "Fetch detail and result for a specific job.",
+            verifySub: "Simulate an Apple receipt verification call."
+        };
+
+        function updateForm() {
+            const action = document.getElementById('actionSelect').value;
+            document.getElementById('actionDescription').textContent = actionDescriptions[action];
+            document.getElementById('formContainer').innerHTML = forms[action] || '';
+
+            if (action === 'addCredits' && currentUser) {
+                setTimeout(() => document.getElementById('creditUserId').value = currentUser.id, 0);
+            }
+        }
+
+        // --- Commands ---
+        async function executeAction() {
+            const action = document.getElementById('actionSelect').value;
+            const token = document.getElementById('userToken').value;
+
+            const headers = {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+                'x-admin-password': adminPassword
+            };
+
+            let url, method, body;
+
+            try {
+                switch (action) {
+                    case 'getParams': method = 'GET'; url = '/admin/config'; break;
+                    case 'setParams':
+                        method = 'POST'; url = '/admin/config';
+                        body = { key: document.getElementById('configKey').value, value: JSON.parse(document.getElementById('configValue').value) };
+                        break;
+                    case 'addCredits':
+                        method = 'POST'; url = '/admin/credits/add';
+                        body = { userId: document.getElementById('creditUserId').value, delta: document.getElementById('creditAmount').value, poolType: document.getElementById('creditPool').value };
+                        break;
+                    case 'createJob':
+                        method = 'POST'; url = '/jobs';
+                        body = { media_type: document.getElementById('jobMetaType').value, prompt: document.getElementById('jobParams').value };
+                        if (document.getElementById('jobModel').value) body.model = document.getElementById('jobModel').value;
+                        if (document.getElementById('jobInputImage').value) body.input_image_url = document.getElementById('jobInputImage').value;
+                        headers['Idempotency-Key'] = crypto.randomUUID();
+                        break;
+                    case 'getBalance': method = 'GET'; url = '/credits/balance'; break;
+                    case 'getLedger': method = 'GET'; url = '/credits/ledger'; break;
+                    case 'getJob': url = `/jobs/${document.getElementById('jobId').value}`; method = 'GET'; break;
+                    case 'verifySub': method = 'POST'; url = '/auth/subscription/verify'; body = { originalTransactionId: document.getElementById('subTxId').value }; break;
+                }
+
+                log(`🚀 ${action === 'createJob' ? 'Job Request Started' : 'Executing ' + action}...`);
+                const res = await fetch(API_URL + url, { method, headers, body: body ? JSON.stringify(body) : undefined });
+                const data = await res.json();
+
+                if (res.status >= 400) {
+                    log(`❌ Request Failed (${res.status})`, data);
+                    return;
+                }
+
+                if (action !== 'createJob') {
+                    log(`✅ Success`, data);
+                }
+
+                // If the response is a job and it's already completed (unlikely for new jobs but good for getJob)
+                if (data.result_url) {
+                    renderLogImage(data.result_url);
+                }
+
+                // If it's a new job, start polling!
+                if (action === 'createJob' && data.jobId) {
+                    startAutoPolling(data.jobId, token);
+                }
+            } catch (err) {
+                log('❌ Request Error', err.message);
+            }
+        }
+
+        // --- Polling Logic ---
+        async function startAutoPolling(jobId, token) {
+            const indicator = document.getElementById('pollingIndicator');
+            if (indicator) indicator.style.display = 'block';
+
+            let attempts = 0;
+            const poll = setInterval(async () => {
+                attempts++;
+                if (attempts > 30) {
+                    clearInterval(poll);
+                    if (indicator) indicator.style.display = 'none';
+                    log('⏳ Polling timed out after 60s');
+                    return;
+                }
+
+                try {
+                    const res = await fetch(`${API_URL}/jobs/${jobId}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const data = await res.json();
+
+                    if (data.status === 'completed') {
+                        clearInterval(poll);
+                        if (indicator) indicator.style.display = 'none';
+                        log(`✨ Generation Complete!`);
+                        renderLogImage(data.result_url);
+                        viewTable(); // Refresh the table too
+                    } else if (data.status === 'failed') {
+                        clearInterval(poll);
+                        if (indicator) indicator.style.display = 'none';
+                        log(`❌ Job Failed`, data.error || data);
+                    }
+                } catch (e) {
+                    // Ignore transient errors
+                }
+            }, 3000);
+        }
+
+        // --- Database Loader ---
+        async function viewTable() {
+            const table = document.getElementById('dbTableSelect').value;
+            const output = document.getElementById('dbOutput');
+            output.innerHTML = '<div style="padding:40px; text-align:center;">Loading data...</div>';
+
+            try {
+                const res = await fetch(`${API_URL}/admin/db/${table}`, {
+                    headers: { 'x-admin-password': adminPassword }
+                });
+                const data = await res.json();
+
+                if (res.status === 200 && Array.isArray(data)) {
+                    if (data.length === 0) {
+                        output.innerHTML = '<div style="padding:40px; text-align:center; color:#64748b">Table is empty</div>';
+                        return;
+                    }
+
+                    const headers = Object.keys(data[0]);
+                    let html = '<table><thead><tr>';
+                    headers.forEach(h => html += `<th>${h}</th>`);
+                    html += '</tr></thead><tbody>';
+
+                    data.forEach(row => {
+                        html += '<tr>';
+                        headers.forEach(h => {
+                            let val = row[h];
+                            if (val && typeof val === 'string' && (val.startsWith('http') || val.startsWith('/uploads'))) {
+                                const isImage = /\.(jpg|jpeg|png|webp|gif|avif)($|\?)/i.test(val) || h.includes('image') || h.includes('url');
+                                const isVideo = /\.(mp4|webm|mov)($|\?)/i.test(val) || h.includes('video');
+
+                                if (isImage) {
+                                    val = `<a href="${val}" target="_blank"><img src="${val}" class="media-thumb" /></a>`;
+                                } else if (isVideo) {
+                                    val = `<video src="${val}" class="media-thumb" controls muted></video><br><a href="${val}" target="_blank" style="font-size: 10px; color: var(--primary)">Open ↗</a>`;
+                                } else {
+                                    val = `<a href="${val}" target="_blank" style="color: var(--primary); font-size:12px; word-break: break-all;">${val}</a>`;
+                                }
+                            } else if (typeof val === 'object' && val !== null) {
+                                val = `<code style="font-size:10px; color:#c026d3">${JSON.stringify(val)}</code>`;
+                            }
+                            html += `<td>${val === null ? '<span style="color:#cbd5e1">null</span>' : val}</td>`;
+                        });
+                        html += '</tr>';
+                    });
+                    html += '</tbody></table>';
+                    output.innerHTML = html;
+                } else {
+                    output.innerHTML = `<div style="padding:40px; text-align:center; color:#ef4444">Error: ${data.error || 'Fetch failed'}</div>`;
+                }
+            } catch (err) {
+                output.innerHTML = `<div style="padding:40px; text-align:center; color:#ef4444">Error: ${err.message}</div>`;
+            }
+        }
+
+        // --- Logging ---
+        function log(msg, data) {
+            const output = document.getElementById('output');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+
+            const time = new Date().toLocaleTimeString();
+            entry.innerHTML = `
+                <div class="log-timestamp">${time}</div>
+                <div style="font-weight:700; color: #1e293b; margin-bottom:4px; font-size: 15px;">${msg}</div>
+            `;
+
+            // Only show details if we REALLY want them or if it's an error
+            if (data && (typeof data !== 'object' || msg.includes('Failed') || msg.includes('Error'))) {
+                const pre = document.createElement('pre');
+                pre.style.margin = '0';
+                pre.style.color = '#ef4444';
+                pre.style.background = '#fef2f2';
+                pre.style.padding = '10px';
+                pre.style.borderRadius = '4px';
+                pre.style.border = '1px solid #fee2e2';
+                pre.style.fontSize = '12px';
+                pre.style.whiteSpace = 'pre-wrap';
+                pre.textContent = typeof data === 'object' ? JSON.stringify(data, null, 2) : data;
+                entry.appendChild(pre);
+            }
+
+            output.prepend(entry);
+        }
+
+        function renderLogImage(url) {
+            const output = document.getElementById('output');
+            const img = document.createElement('img');
+            img.src = url;
+            img.style.width = '100%';
+            img.style.maxWidth = '600px';
+            img.style.marginTop = '15px';
+            img.style.borderRadius = '12px';
+            img.style.boxShadow = 'var(--shadow-lg)';
+            img.style.border = '1px solid var(--border)';
+            output.firstChild.appendChild(img);
+        }
+
+        function clearLogs() {
+            document.getElementById('output').innerHTML = '<div style="color: #64748b; font-style: italic;">Wait for activity...</div>';
+        }
+
+        async function uploadFile() {
+            const fileInput = document.getElementById('imageUpload');
+            const status = document.getElementById('uploadStatus');
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('image', file);
+            status.textContent = '⏳ ...';
+
+            try {
+                const res = await fetch(`${API_URL}/admin/upload`, {
+                    method: 'POST',
+                    headers: { 'x-admin-password': adminPassword },
+                    body: formData
+                });
+                const data = await res.json();
+                if (data.url) {
+                    document.getElementById('jobInputImage').value = data.url;
+                    status.textContent = '✅';
+                } else {
+                    status.textContent = '❌';
+                }
+            } catch (e) {
+                status.textContent = '❌';
+            }
+        }
+    </script>
+</body>
+
+</html>
