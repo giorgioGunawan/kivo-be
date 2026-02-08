@@ -53,8 +53,8 @@ CREATE TABLE IF NOT EXISTS jobs (
 CREATE TABLE IF NOT EXISTS idempotency_keys (
     key VARCHAR(255) PRIMARY KEY,
     user_id INTEGER REFERENCES users(id),
-    endpoint VARCHAR(255),
-    request_hash VARCHAR(255),
+    endpoint TEXT,
+    request_hash TEXT,
     job_id INTEGER REFERENCES jobs(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     expires_at TIMESTAMP WITH TIME ZONE
