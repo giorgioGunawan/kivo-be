@@ -127,9 +127,15 @@ const KieProvider = {
         if (jobData.input_image_url) {
             let finalImageUrl = jobData.input_image_url;
 
-            // If it's a local URL (ngrok or localhost), upload it to Kie's cloud storage first
-            // This follows their "File Upload API" requirement
-            if (finalImageUrl.includes('ngrok-free.dev') || finalImageUrl.includes('localhost')) {
+            // If it's a local URL (ngrok, localhost, or production Railway), upload it to Kie's cloud storage first
+            const baseUrl = (process.env.WEBHOOK_URL || '').replace(/\/$/, '');
+            const isLocal = finalImageUrl.includes('ngrok-free.dev') ||
+                finalImageUrl.includes('localhost') ||
+                finalImageUrl.includes('127.0.0.1') ||
+                (baseUrl && finalImageUrl.startsWith(baseUrl));
+
+            if (isLocal) {
+                console.log('🔄 Local image detected, proxying to Kie.ai storage...');
                 finalImageUrl = await KieProvider._upload_to_kie(finalImageUrl, apiKey);
             }
 
