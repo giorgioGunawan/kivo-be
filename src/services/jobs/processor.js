@@ -96,8 +96,9 @@ const processJob = async (job) => {
             ['failed', jobId]
         );
 
-        // Trigger refund
-        await creditLedgerService.refundJob(userId, jobId, error.message);
+        // Trigger refund with a valid reason code from schema
+        const refundReason = error.message.includes('Timeout') ? 'refund_timeout' : 'provider_error';
+        await creditLedgerService.refundJob(userId, jobId, refundReason);
 
         throw error; // Fail job in BullMQ to trigger retries if configured
     }
