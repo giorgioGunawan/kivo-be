@@ -39,13 +39,27 @@ app.use('/credits', creditRoutes);
 app.use('/admin', adminRoutes);
 app.use('/webhooks', webhookRoutes);
 
-const { verifyAdmin } = require('./middleware/auth');
+const { verifyAdmin, verifyToken } = require('./middleware/auth');
+
+// Admin Upload (Protected by admin password)
 app.post('/admin/upload', verifyAdmin, upload.single('image'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
         const url = await uploadImage(req.file.path, req.file.originalname);
         res.json({ url });
     } catch (e) {
+        res.status(500).json({ error: 'Upload Failed' });
+    }
+});
+
+// App User Upload (Protected by JWT)
+app.post('/jobs/upload', verifyToken, upload.single('image'), async (req, res) => {
+    try {
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+        const url = await uploadImage(req.file.path, req.file.originalname);
+        res.json({ url });
+    } catch (e) {
+        console.error('User upload error:', e);
         res.status(500).json({ error: 'Upload Failed' });
     }
 });
