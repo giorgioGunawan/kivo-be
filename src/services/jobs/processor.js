@@ -15,9 +15,9 @@ const processJob = async (job) => {
 
         if (!currentJob) throw new Error('Job not found in database');
 
-        if (currentJob.status === 'completed') {
-            console.log(`Job ${jobId} already completed. Skipping.`);
-            return { status: 'completed' };
+        if (currentJob.status === 'completed' || currentJob.status === 'failed') {
+            console.log(`Job ${jobId} already in terminal state (${currentJob.status}). Skipping.`);
+            return { status: currentJob.status };
         }
 
         const provider = getProvider(providerName);
@@ -47,7 +47,8 @@ const processJob = async (job) => {
         // In production, use webhooks or a separate polling queue
         let result = null;
         let attempts = 0;
-        while (!result && attempts < 30) { // Bumped to 30 attempts (60s total)
+        const maxAttempts = 300; // 10 minutes (300 * 2s) - AI can be slow!
+        while (!result && attempts < maxAttempts) {
             // A: Check if webhook updated it already
             const dbCheck = await db.query('SELECT status, result_url FROM jobs WHERE id = $1', [jobId]);
             const dbStatus = dbCheck.rows[0].status;
@@ -97,12 +98,17 @@ const processJob = async (job) => {
         // We assume provider charges only on success or we absorb cost if partial.
         // Spec: "Refunds always via ledger entries"
 
+        // If it's a "known" terminal failure (like from a webhook), just stop
+        if (error.message === 'Job failed via webhook') {
+            return { status: 'failed', error: error.message };
+        }
+
+        // If it's a Timeout or other error, mark as failed and refund
         await db.query(
-            'UPDATE jobs SET status = $1 WHERE id = $2',
-            ['failed', jobId]
+            "UPDATE jobs SET status = 'failed' WHERE id = $1 AND status NOT IN ('completed', 'failed')",
+            [jobId]
         );
 
-        // Trigger refund with a valid reason code from schema
         const refundReason = error.message.includes('Timeout') ? 'refund_timeout' : 'provider_error';
         await creditLedgerService.refundJob(userId, jobId, refundReason);
 
