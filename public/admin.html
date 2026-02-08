@@ -480,6 +480,14 @@
             // Try to load initial data
             updateForm();
             viewTable();
+
+            // Clear inputs to prompt fresh upload (since Railway wipes files on deploy)
+            setTimeout(() => {
+                const imgInput = document.getElementById('jobInputImage');
+                if (imgInput) imgInput.value = '';
+                const status = document.getElementById('uploadStatus');
+                if (status) status.textContent = ' (New upload required)';
+            }, 100);
         }
 
         // --- Tabs ---
@@ -587,6 +595,11 @@
 
             if (action === 'addCredits' && currentUser) {
                 setTimeout(() => document.getElementById('creditUserId').value = currentUser.id, 0);
+            }
+
+            if (action === 'createJob') {
+                const status = document.getElementById('uploadStatus');
+                if (status) status.textContent = ' (Fresh upload recommended)';
             }
         }
 
