@@ -14,10 +14,12 @@ const KieProvider = {
     // Upload to Kie helper
     _upload_to_kie: async (url, apiKey) => {
         try {
-            console.log('Preparing to upload to Kie.ai storage. Input:', url);
-
-            // Use the more reliable stream upload if it's a local/ngrok file
-            const isLocal = url.includes('ngrok-free.dev') || url.includes('localhost') || url.includes('127.0.0.1');
+            // Detection Logic: If it's one of ours (local, ngrok, or production railway URL), use stream upload
+            const baseUrl = (process.env.WEBHOOK_URL || '').replace(/\/$/, '');
+            const isLocal = url.includes('ngrok-free.dev') ||
+                url.includes('localhost') ||
+                url.includes('127.0.0.1') ||
+                (baseUrl && url.startsWith(baseUrl));
 
             if (isLocal) {
                 // Map URL back to local file path

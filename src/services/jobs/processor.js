@@ -49,10 +49,16 @@ const processJob = async (job) => {
         let attempts = 0;
         while (!result && attempts < 30) { // Bumped to 30 attempts (60s total)
             // A: Check if webhook updated it already
-            const dbCheck = await db.query('SELECT status, result_url FROM jobs WHERE id = $1', [jobId]);
-            if (dbCheck.rows[0].status === 'completed') {
+            const dbCheck = await db.query('SELECT status, result_url, fail_reason FROM jobs WHERE id = $1', [jobId]);
+            const dbStatus = dbCheck.rows[0].status;
+
+            if (dbStatus === 'completed') {
                 console.log(`Job ${jobId} finished via webhook during polling loop.`);
                 return { status: 'completed', result_url: dbCheck.rows[0].result_url };
+            }
+            if (dbStatus === 'failed') {
+                console.log(`Job ${jobId} marked as failed via webhook during polling loop.`);
+                throw new Error(dbCheck.rows[0].fail_reason || 'Job failed via webhook');
             }
 
             const check = await provider.get_status(providerJobId);
