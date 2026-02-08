@@ -10,6 +10,7 @@
     },
     "dependencies": {
         "@fal-ai/serverless-client": "^0.15.0",
+        "apple-signin-auth": "^2.0.0",
         "axios": "^1.13.4",
         "bullmq": "^4.12.0",
         "cloudinary": "^2.9.0",

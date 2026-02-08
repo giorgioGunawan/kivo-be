@@ -1,38 +1,43 @@
-const axios = require('axios');
-const jwt = require('jsonwebtoken');
+const appleSignin = require('apple-signin-auth');
 
-// Stub for verifying Sign-in with Apple identity token
-// In production, use 'apple-signin-auth' or verify the JWS signature against Apple's public keys
+/**
+ * Verifies Sign-in with Apple identity token using official Apple public keys.
+ * This ensures the token is valid, not expired, and intended for our app.
+ */
 const verifyAppleIdToken = async (identityToken) => {
+    // Development fallback
     if (process.env.NODE_ENV === 'development' && identityToken === 'mock_token') {
         return { sub: 'mock_apple_user_id', email: 'mock@example.com' };
     }
 
-    // Real verification logic would go here
-    // Decode token unverified to get kid
-    // Fetch Apple public keys
-    // Verify signature
-    // Return claims
-    console.log('Verifying Apple Token (Stub)');
-    // Assuming valid for now
-    return { sub: identityToken }; // Using token as ID for simplicity if not real JWT
+    try {
+        const applePayload = await appleSignin.verifyIdToken(identityToken, {
+            // THE APP LOCK: Rejects any token not created for your specific App
+            audience: 'com.giorgiogunawan.kivoai',
+            ignoreExpiration: false, // Security: Ensure token is fresh
+        });
+
+        // 'sub' is the unique, persistent ID for this user provided by Apple
+        return applePayload;
+    } catch (err) {
+        console.error('Apple Token Verification Failed:', err.message);
+        throw new Error('Invalid Apple Identity Token');
+    }
 };
 
-// Stub for App Store Server API v2
-// Need to generate a collection of JWS tokens Signed by developers private key to call Apple API
+/**
+ * Placeholder for App Store Server API v2
+ * In a full production setup, this would use a private key (.p8) to 
+ * generate a JWS and fetch real-time state from Apple.
+ */
 const verifySubscription = async (originalTransactionId) => {
-    // 1. Generate JWT for App Store API access
-    // 2. Call GET https://api.storekit.itunes.apple.com/inApps/v1/subscriptions/{originalTransactionId}
-    // 3. Parse response
+    console.log(`[Apple] Verifying subscription for ${originalTransactionId}`);
 
-    // Mock response
-    console.log(`Verifying subscription for ${originalTransactionId}`);
-
-    // Simulate active subscription
+    // Mock response for now (active for 7 days)
     return {
         isValid: true,
         productId: 'com.kivo.pro.weekly',
-        expiresDate: Date.now() + 7 * 24 * 60 * 60 * 1000, // 7 days from now
+        expiresDate: Date.now() + 7 * 24 * 60 * 60 * 1000,
         status: 'active'
     };
 };

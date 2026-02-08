@@ -33,7 +33,7 @@ router.post('/apple', async (req, res) => {
         }
 
         // Generate Kivo JWT
-        const token = jwt.sign({ id: userId, appleId: appleUserId }, process.env.JWT_SECRET || 'supersecretkey', { expiresIn: '7d' });
+        const token = jwt.sign({ id: userId, appleId: appleUserId }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
         res.json({ token, user: { id: userId, appleUserId } });
     } catch (error) {
@@ -51,7 +51,7 @@ router.post('/subscription/verify', async (req, res) => {
     const token = authHeader.split(' ')[1];
     let userId;
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'supersecretkey');
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
         userId = decoded.id;
     } catch { return res.status(401).send(); }
 
