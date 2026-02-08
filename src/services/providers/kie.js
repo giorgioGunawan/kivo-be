@@ -143,7 +143,7 @@ const KieProvider = {
 
         const requestBody = {
             model: model,
-            callBackUrl: process.env.WEBHOOK_URL ? `${process.env.WEBHOOK_URL}/webhooks/kie` : undefined,
+            callBackUrl: process.env.WEBHOOK_URL ? `${process.env.WEBHOOK_URL.replace(/\/$/, '')}/webhooks/kie` : undefined,
             input: inputParams
         };
 
