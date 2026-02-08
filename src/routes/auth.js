@@ -33,12 +33,16 @@ router.post('/apple', async (req, res) => {
         }
 
         // Generate Kivo JWT
+        if (!process.env.JWT_SECRET) {
+            console.error('CRITICAL: JWT_SECRET environment variable is missing!');
+            throw new Error('Server Configuration Error (JWT_SECRET)');
+        }
         const token = jwt.sign({ id: userId, appleId: appleUserId }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
         res.json({ token, user: { id: userId, appleUserId } });
     } catch (error) {
-        console.error('Apple Auth Error', error);
-        res.status(500).json({ error: 'Authentication Failed' });
+        console.error('Apple Auth Error (Full Context):', error.message);
+        res.status(500).json({ error: `Authentication Failed: ${error.message}` });
     }
 });
 
