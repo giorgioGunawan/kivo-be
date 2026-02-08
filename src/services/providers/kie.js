@@ -73,18 +73,18 @@ const KieProvider = {
             finalImageUrl = await KieProvider._upload_to_kie(finalImageUrl, apiKey);
         }
 
-        // 2. Build Payload (Kie expects 'input' as a stringified object for Grok models)
+        // 2. Build Payload (v1 API expects a clean JSON object, not a string)
         let inputPayload;
         if (isGrokImg2Img) {
-            inputPayload = JSON.stringify({
+            inputPayload = {
                 image_urls: [finalImageUrl],
                 prompt: jobData.prompt
-            });
+            };
         } else {
-            inputPayload = JSON.stringify({
+            inputPayload = {
                 prompt: jobData.prompt,
                 ...(finalImageUrl ? { image_url: finalImageUrl } : {})
-            });
+            };
         }
 
         const requestBody = {
