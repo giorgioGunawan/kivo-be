@@ -605,6 +605,11 @@
 
         // --- Commands ---
         async function executeAction() {
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '⏳ ...';
+
             const action = document.getElementById('actionSelect').value;
             const token = document.getElementById('userToken').value;
 
@@ -649,7 +654,15 @@
                     return;
                 }
 
-                if (action !== 'createJob') {
+                if (action === 'getBalance') {
+                    const balance = `Weekly: ${data.weekly_remaining} | Purchased: ${data.purchased_remaining}`;
+                    log(`✅ Balance Found: ${balance}`, data);
+                } else if (action === 'getLedger') {
+                    log(`✅ Transaction History (${Array.isArray(data) ? data.length : 0} entries)`, data);
+                } else if (action === 'addCredits') {
+                    log(`✅ Credits added successfully`, data);
+                    viewTable(); // Auto refresh the balances table
+                } else if (action !== 'createJob') {
                     log(`✅ Success`, data);
                 }
 
@@ -664,6 +677,9 @@
                 }
             } catch (err) {
                 log('❌ Request Error', err.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
             }
         }
 
@@ -707,6 +723,13 @@
 
         // --- Database Loader ---
         async function viewTable() {
+            const btn = event.target;
+            const originalText = btn.textContent;
+            if (btn.tagName === 'BUTTON') {
+                btn.disabled = true;
+                btn.textContent = '⏳ ...';
+            }
+
             const table = document.getElementById('dbTableSelect').value;
             const output = document.getElementById('dbOutput');
             output.innerHTML = '<div style="padding:40px; text-align:center;">Loading data...</div>';
@@ -757,6 +780,11 @@
                 }
             } catch (err) {
                 output.innerHTML = `<div style="padding:40px; text-align:center; color:#ef4444">Error: ${err.message}</div>`;
+            } finally {
+                if (btn && btn.tagName === 'BUTTON') {
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                }
             }
         }
 
@@ -767,23 +795,30 @@
             entry.className = 'log-entry';
 
             const time = new Date().toLocaleTimeString();
+
+            // Check if successful or failure for title color
+            const isError = msg.includes('Failed') || msg.includes('Error');
+            const color = isError ? '#ef4444' : '#0f172a';
+
             entry.innerHTML = `
                 <div class="log-timestamp">${time}</div>
-                <div style="font-weight:700; color: #1e293b; margin-bottom:4px; font-size: 15px;">${msg}</div>
+                <div style="font-weight:700; color: ${color}; margin-bottom:8px; font-size: 15px;">${msg}</div>
             `;
 
-            // Only show details if we REALLY want them or if it's an error
-            if (data && (typeof data !== 'object' || msg.includes('Failed') || msg.includes('Error'))) {
+            // Always show details if data is present
+            if (data) {
+                const isObject = typeof data === 'object' && data !== null;
                 const pre = document.createElement('pre');
                 pre.style.margin = '0';
-                pre.style.color = '#ef4444';
-                pre.style.background = '#fef2f2';
-                pre.style.padding = '10px';
-                pre.style.borderRadius = '4px';
-                pre.style.border = '1px solid #fee2e2';
+                pre.style.color = isError ? '#ef4444' : '#475569';
+                pre.style.background = isError ? '#fef2f2' : '#f1f5f9';
+                pre.style.padding = '12px';
+                pre.style.borderRadius = '8px';
+                pre.style.border = isError ? '1px solid #fee2e2' : '1px solid #e2e8f0';
                 pre.style.fontSize = '12px';
                 pre.style.whiteSpace = 'pre-wrap';
-                pre.textContent = typeof data === 'object' ? JSON.stringify(data, null, 2) : data;
+                pre.style.overflowX = 'auto';
+                pre.textContent = isObject ? JSON.stringify(data, null, 2) : data;
                 entry.appendChild(pre);
             }
 
