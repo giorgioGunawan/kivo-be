@@ -4,14 +4,22 @@ const path = require('path');
 const uploadImage = async (filePath) => {
     // Move file from temp 'uploads/' to 'public/uploads/'
     const fileName = path.basename(filePath);
-    const targetPath = path.join(__dirname, '../../public/uploads', fileName);
+    const targetPath = path.join(process.cwd(), 'public/uploads', fileName);
 
     // Create dir if not exists
-    if (!fs.existsSync(path.dirname(targetPath))) {
-        fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+    const dir = path.dirname(targetPath);
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
     }
 
-    fs.renameSync(filePath, targetPath);
+    try {
+        // Use copy + unlink instead of rename because rename can fail across partitions in cloud environments
+        fs.copyFileSync(filePath, targetPath);
+        fs.unlinkSync(filePath);
+    } catch (e) {
+        console.error('Storage move failed, trying rename fallback:', e.message);
+        fs.renameSync(filePath, targetPath);
+    }
 
     // Return URL
     // Use WEBHOOK_URL (ngrok) if available so external providers can access the file

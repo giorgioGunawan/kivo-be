@@ -25,7 +25,7 @@ const KieProvider = {
                 // Map URL back to local file path
                 // URL format: https://.../uploads/filename
                 const fileName = path.basename(url);
-                const localPath = path.resolve(__dirname, '../../..', 'public/uploads', fileName);
+                const localPath = path.join(process.cwd(), 'public/uploads', fileName);
 
                 if (fs.existsSync(localPath)) {
                     console.log('Uploading local file via stream:', localPath);
