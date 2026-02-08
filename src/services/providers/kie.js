@@ -94,7 +94,7 @@ const KieProvider = {
         };
 
         try {
-            const res = await axios.post('https://kieai.redpandaai.co/api/task-submit', requestBody, {
+            const res = await axios.post('https://api.kie.ai/api/v1/jobs/createTask', requestBody, {
                 headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' }
             });
 
