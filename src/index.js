@@ -28,6 +28,18 @@ app.get('/', (req, res) => {
     res.send('Kivo AI Backend is running 🚀');
 });
 
+// Auto-migration for idempotency column sizes
+(async () => {
+    try {
+        console.log('[Migration] Checking idempotency_keys column sizes...');
+        await db.query('ALTER TABLE idempotency_keys ALTER COLUMN request_hash TYPE TEXT;');
+        await db.query('ALTER TABLE idempotency_keys ALTER COLUMN endpoint TYPE TEXT;');
+        console.log('[Migration] Database columns updated successfully.');
+    } catch (err) {
+        console.error('[Migration] Failed to update columns (probably already done):', err.message);
+    }
+})();
+
 app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, '../public/admin.html'));
 });
