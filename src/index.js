@@ -43,7 +43,7 @@ const { verifyAdmin } = require('./middleware/auth');
 app.post('/admin/upload', verifyAdmin, upload.single('image'), async (req, res) => {
     try {
         if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-        const url = await uploadImage(req.file.path);
+        const url = await uploadImage(req.file.path, req.file.originalname);
         res.json({ url });
     } catch (e) {
         res.status(500).json({ error: 'Upload Failed' });

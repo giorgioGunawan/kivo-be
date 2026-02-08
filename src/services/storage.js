@@ -6,9 +6,16 @@ const path = require('path');
  * Uses process.cwd() for absolute path reliability on cloud platforms like Railway.
  * Note: Storage is ephemeral on Railway and will be cleared on redeploy.
  */
-const uploadImage = async (filePath) => {
+const uploadImage = async (filePath, originalName = null) => {
     // 1. Determine local paths
-    const fileName = path.basename(filePath);
+    let fileName = path.basename(filePath);
+
+    // If we have the original name, preserve the extension
+    if (originalName) {
+        const ext = path.extname(originalName);
+        if (ext) fileName += ext;
+    }
+
     const publicDir = path.join(process.cwd(), 'public/uploads');
     const targetPath = path.join(publicDir, fileName);
 

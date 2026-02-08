@@ -31,8 +31,16 @@ const KieProvider = {
                     console.log(`[Kie] Proxying local file to Kie cloud: ${localPath}`);
                     const FormData = require('form-data');
                     const form = new FormData();
+
+                    const ext = path.extname(fileName).toLowerCase();
+                    let contentType = 'image/png';
+                    if (ext === '.jpg' || ext === '.jpeg') contentType = 'image/jpeg';
+                    if (ext === '.webp') contentType = 'image/webp';
+                    if (ext === '.gif') contentType = 'image/gif';
+
                     form.append('file', fs.createReadStream(localPath), {
-                        filename: fileName.includes('.') ? fileName : `${fileName}.png`
+                        filename: fileName.includes('.') ? fileName : `${fileName}.png`,
+                        contentType: contentType
                     });
 
                     const res = await axios.post('https://kieai.redpandaai.co/api/file-stream-upload', form, {
