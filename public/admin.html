@@ -404,7 +404,7 @@
                             <option value="verifySub">✅ Verify Subscription</option>
                         </optgroup>
                         <optgroup label="Admin Tools">
-                            <option value="addCredits">💰 Give Free Credits</option>
+                            <option value="addCredits">💰 Manage User Credits</option>
                             <option value="getParams">⚙️ System Settings</option>
                             <option value="setParams">✏️ Change Settings</option>
                         </optgroup>
@@ -448,7 +448,7 @@
 
             <div class="card">
                 <div class="card-header">
-                    <h3>🚀 Active & Waiting Jobs (Top 50)</h3>
+                    <h3>🚀 Active, Waiting & Failed Jobs (Top 50)</h3>
                 </div>
                 <div class="table-scroll">
                     <table id="queueTable">
@@ -594,13 +594,26 @@
                         tbody.innerHTML = data.jobs.map(job => {
                             const date = new Date(job.timestamp).toLocaleString();
                             const duration = job.processedOn ? ((job.finishedOn || Date.now()) - job.processedOn) / 1000 + 's' : '-';
-                            const stateColor = job.state === 'active' ? '#3b82f6' : (job.state === 'waiting' ? '#f59e0b' : '#64748b');
+
+                            let stateColor = '#64748b';
+                            if (job.state === 'active') stateColor = '#3b82f6';
+                            if (job.state === 'waiting') stateColor = '#f59e0b';
+                            if (job.state === 'failed') stateColor = '#ef4444';
+                            if (job.state === 'completed') stateColor = '#10b981';
+
+                            let details = '';
+                            if (job.state === 'failed' && job.failedReason) {
+                                details = `<div style="color: #ef4444; font-size: 10px; margin-top: 4px; max-width: 200px; word-wrap: break-word;">${job.failedReason}</div>`;
+                            }
 
                             return `
                                 <tr>
                                     <td><code style="font-size:11px">${job.id}</code></td>
                                     <td><span style="background:#e0f2fe; color:#0369a1; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:600">ID ${job.userId}</span> <div style="font-size:10px; color:#64748b">${job.data?.providerName || ''}</div></td>
-                                    <td><span style="color:${stateColor}; font-weight:700; text-transform:capitalize">● ${job.state}</span></td>
+                                    <td>
+                                        <span style="color:${stateColor}; font-weight:700; text-transform:capitalize">● ${job.state}</span>
+                                        ${details}
+                                    </td>
                                     <td>${job.attempts}</td>
                                     <td style="font-size:12px">${date}</td>
                                     <td style="font-size:12px">${duration}</td>
@@ -650,7 +663,8 @@
             `,
             addCredits: `
                 <label>User ID</label><input type="text" id="creditUserId" placeholder="User ID">
-                <label>Amount</label><input type="number" id="creditAmount" value="500">
+                <label>Amount (Negative to deduct)</label><input type="number" id="creditAmount" value="500">
+                <label>Reason</label><input type="text" id="creditReason" placeholder="e.g. Refund, Bonus">
                 <label>Pool</label>
                 <select id="creditPool">
                     <option value="weekly">Weekly</option>
@@ -697,7 +711,7 @@
         const actionDescriptions = {
             getParams: "Fetch current system configuration constants.",
             setParams: "Overwrite a configuration key in the database.",
-            addCredits: "Force-add credits to a specific user (ledger entry created).",
+            addCredits: "Add or deduct credits for a user (use negative value to remove).",
             createJob: "Simulate a user creating a new AI job. It will auto-poll for the result!",
             getBalance: "Get the credit balance for the authenticated simulation user.",
             getLedger: "See the full history of credit transactions for the user.",
@@ -747,7 +761,13 @@
                         break;
                     case 'addCredits':
                         method = 'POST'; url = '/admin/credits/add';
-                        body = { userId: document.getElementById('creditUserId').value, delta: document.getElementById('creditAmount').value, poolType: document.getElementById('creditPool').value };
+                        const reason = document.getElementById('creditReason').value || 'admin_adjustment';
+                        body = {
+                            userId: document.getElementById('creditUserId').value,
+                            delta: document.getElementById('creditAmount').value,
+                            poolType: document.getElementById('creditPool').value,
+                            reason: reason
+                        };
                         break;
                     case 'createJob':
                         method = 'POST'; url = '/jobs';

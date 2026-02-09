@@ -30,11 +30,11 @@ router.get('/config', async (req, res) => {
 
 // Admin override to add credits
 router.post('/credits/add', async (req, res) => {
-    const { userId, delta, poolType } = req.body;
+    const { userId, delta, poolType, reason } = req.body;
     try {
         const { creditLedgerService } = require('../services/credits/ledger');
         await creditLedgerService.createEntry(
-            { userId, poolType, delta: parseInt(delta), reason: 'purchase' },
+            { userId, poolType, delta: parseInt(delta), reason: reason || 'admin_adjust' },
             await db.pool.connect() // Assuming admin requests are occasional
         );
         res.json({ success: true });
@@ -78,11 +78,13 @@ router.get('/queue', async (req, res) => {
         // BullMQ getJobs returns Promise<Job[]>
         const activeJobs = await jobQueue.getJobs(['active'], 0, 49, true);
         const waitingJobs = await jobQueue.getJobs(['waiting'], 0, 49, true); // FIFO
+        const failedJobs = await jobQueue.getJobs(['failed'], 0, 49, true);
 
         const formatJob = async (job) => ({
             id: job.id,
             userId: job.data ? job.data.userId : 'unknown',
             state: await job.getState(),
+            failedReason: job.failedReason,
             timestamp: job.timestamp,
             processedOn: job.processedOn,
             finishedOn: job.finishedOn,
@@ -93,7 +95,8 @@ router.get('/queue', async (req, res) => {
         // Map returns an array of Promises because formatJob is async
         const jobs = [
             ...(await Promise.all(activeJobs.map(formatJob))),
-            ...(await Promise.all(waitingJobs.map(formatJob)))
+            ...(await Promise.all(waitingJobs.map(formatJob))),
+            ...(await Promise.all(failedJobs.map(formatJob)))
         ];
 
         res.json({
