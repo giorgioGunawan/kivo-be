@@ -67,4 +67,43 @@ router.get('/db/:table', async (req, res) => {
     }
 });
 
+const { jobQueue } = require('../services/queue');
+
+// Queue Status API
+router.get('/queue', async (req, res) => {
+    try {
+        const counts = await jobQueue.getJobCounts('waiting', 'active', 'completed', 'failed', 'delayed');
+
+        // Fetch active and waiting jobs (limit 50) for detailed view
+        // BullMQ getJobs returns Promise<Job[]>
+        const activeJobs = await jobQueue.getJobs(['active'], 0, 49, true);
+        const waitingJobs = await jobQueue.getJobs(['waiting'], 0, 49, true); // FIFO
+
+        const formatJob = async (job) => ({
+            id: job.id,
+            userId: job.data ? job.data.userId : 'unknown',
+            state: await job.getState(),
+            timestamp: job.timestamp,
+            processedOn: job.processedOn,
+            finishedOn: job.finishedOn,
+            attempts: job.attemptsMade,
+            data: job.data
+        });
+
+        // Map returns an array of Promises because formatJob is async
+        const jobs = [
+            ...(await Promise.all(activeJobs.map(formatJob))),
+            ...(await Promise.all(waitingJobs.map(formatJob)))
+        ];
+
+        res.json({
+            counts,
+            jobs: jobs.slice(0, 100)
+        });
+    } catch (e) {
+        console.error('Queue Fetch Error:', e);
+        res.status(500).json({ error: 'Failed to fetch queue status' });
+    }
+});
+
 module.exports = router;

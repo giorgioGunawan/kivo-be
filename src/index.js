@@ -70,7 +70,11 @@ const worker = new Worker('kivo-ai-jobs', async (job) => {
     return await processJob(job);
 }, {
     connection: require('./services/queue').redisConnection,
-    concurrency: 5 // Process 5 jobs concurrently
+    concurrency: 50, // Allow up to 50 concurrent jobs (below provider ~100 limit)
+    limiter: {
+        max: 20, // Max 20 jobs started...
+        duration: 10000 // ...per 10 seconds
+    }
 });
 
 worker.on('completed', (job) => {

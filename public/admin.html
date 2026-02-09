@@ -371,11 +371,13 @@
 
         <div class="tabs">
             <div class="tab active" onclick="switchTab('simulator')">Simulator & Logs</div>
+            <div class="tab" onclick="switchTab('queue')">Job Queue</div>
             <div class="tab" onclick="switchTab('database')">Database Browser</div>
         </div>
 
         <!-- Simulator Pane -->
         <div id="simulatorPane" class="pane active">
+
             <div class="sidebar">
                 <!-- Auth Card -->
                 <div class="card" style="margin-bottom: 24px;">
@@ -431,8 +433,48 @@
             </div>
         </div>
 
+        <!-- Queue Pane -->
+        <div id="queuePane" class="pane">
+            <div class="card" style="margin-bottom: 24px;">
+                <div class="card-header">
+                    <h3>📊 Queue Overview</h3>
+                    <button class="secondary" onclick="fetchQueueStatus()">Refresh Queue</button>
+                </div>
+                <div id="queueStats"
+                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 16px; text-align: center;">
+                    Loading...
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3>🚀 Active & Waiting Jobs (Top 50)</h3>
+                </div>
+                <div class="table-scroll">
+                    <table id="queueTable">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>User</th>
+                                <th>State</th>
+                                <th>Attempts</th>
+                                <th>Created</th>
+                                <th>Duration</th>
+                            </tr>
+                        </thead>
+                        <tbody id="queueTableBody">
+                            <tr>
+                                <td colspan="6" style="text-align:center; padding:20px">No jobs found</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <!-- Database Pane -->
         <div id="databasePane" class="pane">
+            <!-- ... (existing db content) ... -->
             <div class="table-browser">
                 <div class="table-controls">
                     <div>
@@ -479,7 +521,8 @@
 
             // Try to load initial data
             updateForm();
-            viewTable();
+            // viewTable(); // Don't auto load table, maybe too heavy
+            fetchQueueStatus();
 
             // Clear inputs to prompt fresh upload (since Railway wipes files on deploy)
             setTimeout(() => {
@@ -495,9 +538,83 @@
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
 
-            event.target.classList.add('active');
+            // Find the tab element corresponding to the tabId
+            // Simpler: just loop tabs and see if onclick matches or use index.
+            // But here I can just use event.target if triggered by click.
+            if (event && event.target && event.target.classList.contains('tab')) {
+                event.target.classList.add('active');
+            } else {
+                // Manual switch fallback
+                const tabs = document.querySelectorAll('.tab');
+                if (tabId === 'simulator') tabs[0].classList.add('active');
+                if (tabId === 'queue') tabs[1].classList.add('active');
+                if (tabId === 'database') tabs[2].classList.add('active');
+            }
+
             document.getElementById(`${tabId}Pane`).classList.add('active');
+
+            if (tabId === 'queue') fetchQueueStatus();
         }
+
+        // --- Queue Logic ---
+        async function fetchQueueStatus() {
+            const statsDiv = document.getElementById('queueStats');
+            const tbody = document.getElementById('queueTableBody');
+
+            // statsDiv.innerHTML = 'Loading...'; 
+
+            try {
+                const res = await fetch(`${API_URL}/admin/queue`, {
+                    headers: { 'x-admin-password': adminPassword }
+                });
+                const data = await res.json();
+
+                if (data.counts) {
+                    // Render Stats
+                    const statBox = (label, val, color) => `
+                        <div style="background: ${color}10; padding: 12px; border-radius: 8px; border: 1px solid ${color}30">
+                            <div style="font-size:24px; font-weight:800; color:${color}">${val}</div>
+                            <div style="font-size:12px; font-weight:600; color:${color}; text-transform:uppercase">${label}</div>
+                        </div>
+                    `;
+
+                    statsDiv.innerHTML = `
+                        ${statBox('Waiting', data.counts.waiting, '#f59e0b')}
+                        ${statBox('Active', data.counts.active, '#3b82f6')}
+                        ${statBox('Completed', data.counts.completed, '#10b981')}
+                        ${statBox('Failed', data.counts.failed, '#ef4444')}
+                        ${statBox('Delayed', data.counts.delayed, '#6366f1')}
+                    `;
+                }
+
+                if (data.jobs && Array.isArray(data.jobs)) {
+                    if (data.jobs.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:#64748b">No active or waiting jobs</td></tr>';
+                    } else {
+                        tbody.innerHTML = data.jobs.map(job => {
+                            const date = new Date(job.timestamp).toLocaleString();
+                            const duration = job.processedOn ? ((job.finishedOn || Date.now()) - job.processedOn) / 1000 + 's' : '-';
+                            const stateColor = job.state === 'active' ? '#3b82f6' : (job.state === 'waiting' ? '#f59e0b' : '#64748b');
+
+                            return `
+                                <tr>
+                                    <td><code style="font-size:11px">${job.id}</code></td>
+                                    <td><span style="background:#e0f2fe; color:#0369a1; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:600">ID ${job.userId}</span> <div style="font-size:10px; color:#64748b">${job.data?.providerName || ''}</div></td>
+                                    <td><span style="color:${stateColor}; font-weight:700; text-transform:capitalize">● ${job.state}</span></td>
+                                    <td>${job.attempts}</td>
+                                    <td style="font-size:12px">${date}</td>
+                                    <td style="font-size:12px">${duration}</td>
+                                </tr>
+                            `;
+                        }).join('');
+                    }
+                }
+
+            } catch (e) {
+                statsDiv.innerHTML = `<div style="color:red">Error: ${e.message}</div>`;
+            }
+        }
+
 
         // --- Application State ---
         let currentUser = null;
