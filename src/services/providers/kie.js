@@ -89,7 +89,7 @@ const KieProvider = {
             inputPayload = {
                 image_urls: finalImageUrl ? [finalImageUrl] : [],
                 prompt: jobData.prompt || jobData.jobParams?.prompt,
-                image_size: jobData.image_size || jobData.jobParams?.image_size || '1:1',
+                image_size: jobData.image_size || jobData.jobParams?.image_size || 'auto',
                 output_format: jobData.output_format || jobData.jobParams?.output_format || 'png'
             };
         } else {
