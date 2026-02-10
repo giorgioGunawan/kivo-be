@@ -74,10 +74,11 @@ router.get('/queue', async (req, res) => {
     try {
         const counts = await jobQueue.getJobCounts('waiting', 'active', 'completed', 'failed', 'delayed');
 
-        // Fetch active, waiting and failed jobs (limit 50 each) for detailed view
+        // Fetch active, waiting, failed and completed jobs (limit 50 each) for detailed view
         const activeJobs = await jobQueue.getJobs(['active'], 0, 49, true);
         const waitingJobs = await jobQueue.getJobs(['waiting'], 0, 49, true);
         const failedJobs = await jobQueue.getJobs(['failed'], 0, 49, true);
+        const completedJobs = await jobQueue.getJobs(['completed'], 0, 49, true);
 
         const formatJob = async (job) => ({
             id: job.id,
@@ -94,7 +95,8 @@ router.get('/queue', async (req, res) => {
         let jobs = [
             ...(await Promise.all(activeJobs.map(formatJob))),
             ...(await Promise.all(waitingJobs.map(formatJob))),
-            ...(await Promise.all(failedJobs.map(formatJob)))
+            ...(await Promise.all(failedJobs.map(formatJob))),
+            ...(await Promise.all(completedJobs.map(formatJob)))
         ];
 
         // Sort by timestamp DESC so newest always at top

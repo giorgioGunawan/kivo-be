@@ -14,8 +14,8 @@ const jobQueue = new Queue('kivo-ai-jobs', {
             type: 'exponential',
             delay: 1000,
         },
-        removeOnComplete: true,
-        removeOnFail: 100, // Keep failed jobs for debugging
+        removeOnComplete: 100, // Keep last 100 completed jobs for visibility
+        removeOnFail: 500, // Keep more failed jobs for debugging
     },
 });
 
