@@ -72,25 +72,29 @@ const KieProvider = {
         const apiKey = process.env.KIE_KEY;
         if (!apiKey) throw new Error('KIE_KEY not configured');
 
-        let model = jobData.model || 'grok-imagine/image-to-image';
-        const isGrokImg2Img = model === 'grok-imagine/image-to-image';
+        let model = jobData.model || jobData.jobParams?.model || 'grok-imagine/image-to-image';
+        const isImg2ImgModel = model === 'grok-imagine/image-to-image' || model === 'google/nano-banana-edit';
+
+        console.log(`[Kie] Selected model: ${model}`);
 
         // 1. Prepare and Upload Media
-        let finalImageUrl = jobData.input_image_url || jobData.image_url;
+        let finalImageUrl = jobData.input_image_url || jobData.image_url || jobData.jobParams?.input_image_url;
         if (finalImageUrl) {
             finalImageUrl = await KieProvider._upload_to_kie(finalImageUrl, apiKey);
         }
 
         // 2. Build Payload (v1 API expects a clean JSON object, not a string)
         let inputPayload;
-        if (isGrokImg2Img) {
+        if (isImg2ImgModel) {
             inputPayload = {
-                image_urls: [finalImageUrl],
-                prompt: jobData.prompt
+                image_urls: finalImageUrl ? [finalImageUrl] : [],
+                prompt: jobData.prompt || jobData.jobParams?.prompt,
+                image_size: jobData.image_size || jobData.jobParams?.image_size || '1:1',
+                output_format: jobData.output_format || jobData.jobParams?.output_format || 'png'
             };
         } else {
             inputPayload = {
-                prompt: jobData.prompt,
+                prompt: jobData.prompt || jobData.jobParams?.prompt,
                 ...(finalImageUrl ? { image_url: finalImageUrl } : {})
             };
         }
