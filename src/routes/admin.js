@@ -74,10 +74,9 @@ router.get('/queue', async (req, res) => {
     try {
         const counts = await jobQueue.getJobCounts('waiting', 'active', 'completed', 'failed', 'delayed');
 
-        // Fetch active and waiting jobs (limit 50) for detailed view
-        // BullMQ getJobs returns Promise<Job[]>
+        // Fetch active, waiting and failed jobs (limit 50 each) for detailed view
         const activeJobs = await jobQueue.getJobs(['active'], 0, 49, true);
-        const waitingJobs = await jobQueue.getJobs(['waiting'], 0, 49, true); // FIFO
+        const waitingJobs = await jobQueue.getJobs(['waiting'], 0, 49, true);
         const failedJobs = await jobQueue.getJobs(['failed'], 0, 49, true);
 
         const formatJob = async (job) => ({
@@ -92,12 +91,14 @@ router.get('/queue', async (req, res) => {
             data: job.data
         });
 
-        // Map returns an array of Promises because formatJob is async
-        const jobs = [
+        let jobs = [
             ...(await Promise.all(activeJobs.map(formatJob))),
             ...(await Promise.all(waitingJobs.map(formatJob))),
             ...(await Promise.all(failedJobs.map(formatJob)))
         ];
+
+        // Sort by timestamp DESC so newest always at top
+        jobs.sort((a, b) => b.timestamp - a.timestamp);
 
         res.json({
             counts,
@@ -106,6 +107,29 @@ router.get('/queue', async (req, res) => {
     } catch (e) {
         console.error('Queue Fetch Error:', e);
         res.status(500).json({ error: 'Failed to fetch queue status' });
+    }
+});
+
+// Clear Failed Jobs API
+router.post('/queue/clear-failed', async (req, res) => {
+    try {
+        // clean(gracePeriod, limit, state)
+        await jobQueue.clean(0, 1000, 'failed');
+        res.json({ success: true });
+    } catch (e) {
+        console.error('Clear Failed Error:', e);
+        res.status(500).json({ error: 'Failed to clear failed jobs' });
+    }
+});
+
+// Cleanup Failed Jobs in Database
+router.post('/db/cleanup-failed-jobs', async (req, res) => {
+    try {
+        const result = await db.query("DELETE FROM jobs WHERE status = 'failed'");
+        res.json({ success: true, count: result.rowCount });
+    } catch (e) {
+        console.error('DB Cleanup Error:', e);
+        res.status(500).json({ error: 'Failed to cleanup jobs table' });
     }
 });
 

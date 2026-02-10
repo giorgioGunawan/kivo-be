@@ -439,6 +439,8 @@
                 <div class="card-header">
                     <h3>📊 Queue Overview</h3>
                     <button class="secondary" onclick="fetchQueueStatus()">Refresh Queue</button>
+                    <button style="background: #fee2e2; color: #991b1b; border: 1px solid #fecaca"
+                        onclick="clearFailedJobs()">Clear Failed Jobs</button>
                 </div>
                 <div id="queueStats"
                     style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 16px; text-align: center;">
@@ -491,6 +493,8 @@
                         </select>
                     </div>
                     <button onclick="viewTable()" style="height:42px">🔄 Refresh Data</button>
+                    <button style="height:42px; background: #fee2e2; color: #991b1b; border: 1px solid #fecaca"
+                        onclick="cleanupFailedDbJobs()">🧹 Cleanup Failed Jobs</button>
                 </div>
 
                 <div class="card table-view" style="padding:0; overflow:hidden;">
@@ -625,6 +629,44 @@
 
             } catch (e) {
                 statsDiv.innerHTML = `<div style="color:red">Error: ${e.message}</div>`;
+            }
+        }
+
+        async function clearFailedJobs() {
+            if (!confirm('Are you sure you want to clear ALL failed jobs from the queue?')) return;
+            try {
+                const res = await fetch(`${API_URL}/admin/queue/clear-failed`, {
+                    method: 'POST',
+                    headers: { 'x-admin-password': adminPassword }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert('Queue cleared');
+                    fetchQueueStatus();
+                } else {
+                    alert('Failed to clear queue: ' + (data.error || 'Unknown error'));
+                }
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
+        async function cleanupFailedDbJobs() {
+            if (!confirm('Are you sure you want to PERMANENTLY delete all failed jobs from the database?')) return;
+            try {
+                const res = await fetch(`${API_URL}/admin/db/cleanup-failed-jobs`, {
+                    method: 'POST',
+                    headers: { 'x-admin-password': adminPassword }
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert(`Cleanup successful. Deleted ${data.count} jobs.`);
+                    viewTable();
+                } else {
+                    alert('Failed to cleanup: ' + (data.error || 'Unknown error'));
+                }
+            } catch (e) {
+                alert('Error: ' + e.message);
             }
         }
 
