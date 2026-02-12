@@ -706,7 +706,17 @@
             addCredits: `
                 <label>User ID</label><input type="text" id="creditUserId" placeholder="User ID">
                 <label>Amount (Negative to deduct)</label><input type="number" id="creditAmount" value="500">
-                <label>Reason</label><input type="text" id="creditReason" placeholder="e.g. Refund, Bonus">
+                <label>Reason</label>
+                <select id="creditReason">
+                    <option value="admin_adjust">admin_adjust</option>
+                    <option value="refund_failure">refund_failure</option>
+                    <option value="refund_timeout">refund_timeout</option>
+                    <option value="provider_error">provider_error</option>
+                    <option value="purchase">purchase</option>
+                    <option value="refresh">refresh</option>
+                    <option value="generation">generation</option>
+                    <option value="expiry">expiry</option>
+                </select>
                 <label>Pool</label>
                 <select id="creditPool">
                     <option value="weekly">Weekly</option>
