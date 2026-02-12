@@ -8,8 +8,11 @@ router.use(verifyToken);
 router.get('/balance', async (req, res) => {
     try {
         const result = await db.query(
-            `SELECT weekly_remaining, purchased_remaining, weekly_reset_at 
-             FROM credit_balances WHERE user_id = $1`,
+            `SELECT cb.weekly_remaining, cb.purchased_remaining, cb.weekly_reset_at,
+                    COALESCE(s.status = 'active', false) AS is_pro_subscriber
+             FROM credit_balances cb
+             LEFT JOIN subscriptions s ON s.user_id = cb.user_id
+             WHERE cb.user_id = $1`,
             [req.user.id]
         );
         if (result.rows.length === 0) return res.status(404).json({ error: 'User not found' });

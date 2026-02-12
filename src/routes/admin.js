@@ -33,9 +33,10 @@ router.post('/credits/add', async (req, res) => {
     const { userId, delta, poolType, reason } = req.body;
     try {
         const { creditLedgerService } = require('../services/credits/ledger');
+        // Pass null so createEntry uses the pool directly — no leaked connection
         await creditLedgerService.createEntry(
             { userId, poolType, delta: parseInt(delta), reason: reason || 'admin_adjust' },
-            await db.pool.connect() // Assuming admin requests are occasional
+            null
         );
         res.json({ success: true });
     } catch (e) {

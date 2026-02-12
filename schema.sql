@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS credit_ledger (
     user_id INTEGER REFERENCES users(id),
     pool_type VARCHAR(20) NOT NULL CHECK (pool_type IN ('weekly', 'purchased')),
     delta INTEGER NOT NULL,
-    reason VARCHAR(50) NOT NULL CHECK (reason IN ('refresh', 'generation', 'purchase', 'expiry', 'refund_failure', 'refund_timeout', 'provider_error')),
+    reason VARCHAR(50) NOT NULL CHECK (reason IN ('refresh', 'generation', 'purchase', 'expiry', 'refund_failure', 'refund_timeout', 'provider_error', 'admin_adjust')),
     job_id INTEGER, -- nullable for non-job related entries
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
