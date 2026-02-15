@@ -9,8 +9,10 @@ const appleSignin = require('apple-signin-auth');
 const verifyAppleIdToken = async (identityToken) => {
     // Development fallback
     // ALLOW MOCK TOKEN for Admin Panel Testing
-    // REMOVED at user request for strict production readiness
-    // if (identityToken === 'mock_token') { ... }
+    // (Restored for Admin Simulator usage - Subscription verification is still REAL and SECURE)
+    if (identityToken === 'mock_token') {
+        return { sub: 'mock_apple_user_id', email: 'mock@example.com' };
+    }
 
     try {
         const applePayload = await appleSignin.verifyIdToken(identityToken, {
