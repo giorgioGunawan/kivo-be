@@ -31,14 +31,18 @@ const verifyAppleIdToken = async (identityToken) => {
  * In a full production setup, this would use a private key (.p8) to 
  * generate a JWS and fetch real-time state from Apple.
  */
-const verifySubscription = async (originalTransactionId) => {
-    console.log(`[Apple] Verifying subscription for ${originalTransactionId}`);
+const verifySubscription = async (originalTransactionId, environment) => {
+    console.log(`[Apple] Verifying subscription for ${originalTransactionId} (${environment})`);
 
-    // Mock response for now (active for 7 days)
+    // In Sandbox, renewals happen every few minutes (e.g. 3 mins)
+    // In Production, it's 7 days
+    const duration = (environment === 'Sandbox') ? 3 * 60 * 1000 : 7 * 24 * 60 * 60 * 1000;
+
+    // Mock response for now (active for set duration)
     return {
         isValid: true,
         productId: 'com.kivo.pro.weekly',
-        expiresDate: Date.now() + 7 * 24 * 60 * 60 * 1000,
+        expiresDate: Date.now() + duration,
         status: 'active'
     };
 };

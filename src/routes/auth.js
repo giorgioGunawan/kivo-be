@@ -59,10 +59,10 @@ router.post('/subscription/verify', async (req, res) => {
         userId = decoded.id;
     } catch { return res.status(401).send(); }
 
-    const { originalTransactionId } = req.body;
+    const { originalTransactionId, environment } = req.body;
 
     try {
-        const result = await verifySubscription(originalTransactionId);
+        const result = await verifySubscription(originalTransactionId, environment);
         const { creditRefreshService } = require('../services/credits/refresh');
 
         const client = await db.pool.connect();
@@ -85,11 +85,12 @@ router.post('/subscription/verify', async (req, res) => {
 
             // If subscription is active, check if eligible for credit refresh
             if (result.status === 'active') {
-                const isEligible = await creditRefreshService.isEligibleForRefresh(userId, client);
+                const isSandbox = environment === 'Sandbox';
+                const isEligible = await creditRefreshService.isEligibleForRefresh(userId, client, isSandbox);
 
                 if (isEligible) {
                     await creditRefreshService.refreshWeeklyCredits(userId, 'refresh', client);
-                    console.log(`✅ Refreshed credits for user ${userId} via manual verification`);
+                    console.log(`✅ Refreshed credits for user ${userId} via manual verification (Sandbox: ${isSandbox})`);
                 }
             } else if (result.status === 'expired') {
                 // Forfeit weekly credits if subscription expired

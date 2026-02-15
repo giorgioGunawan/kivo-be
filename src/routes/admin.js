@@ -28,6 +28,30 @@ router.get('/config', async (req, res) => {
     }
 });
 
+// Check User Subscription & Credits
+router.get('/user/:id/subscription', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const subRes = await db.query('SELECT * FROM subscriptions WHERE user_id = $1', [id]);
+        const balanceRes = await db.query('SELECT * FROM credit_balances WHERE user_id = $1', [id]);
+        const userRes = await db.query('SELECT * FROM users WHERE id = $1', [id]);
+
+        if (subRes.rows.length === 0 && balanceRes.rows.length === 0) {
+            return res.status(404).json({ error: 'User not found or has no data' });
+        }
+
+        res.json({
+            user: userRes.rows[0],
+            subscription: subRes.rows[0] || null,
+            credits: balanceRes.rows[0] || null,
+            serverTime: new Date()
+        });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Failed to fetch user data' });
+    }
+});
+
 // Admin override to add credits
 router.post('/credits/add', async (req, res) => {
     const { userId, delta, poolType, reason } = req.body;

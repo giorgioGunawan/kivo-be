@@ -405,6 +405,7 @@
                         </optgroup>
                         <optgroup label="Admin Tools">
                             <option value="addCredits">💰 Manage User Credits</option>
+                            <option value="checkUser">👤 Check User Status</option>
                             <option value="getParams">⚙️ System Settings</option>
                             <option value="setParams">✏️ Change Settings</option>
                         </optgroup>
@@ -758,7 +759,8 @@
             getBalance: '',
             getLedger: '',
             getJob: `<label>Job ID</label><input type="text" id="jobId" placeholder="Job ID">`,
-            verifySub: `<label>Transaction ID</label><input type="text" id="subTxId" value="1000000">`
+            verifySub: `<label>Transaction ID</label><input type="text" id="subTxId" value="1000000">`,
+            checkUser: `<label>User ID</label><input type="text" id="checkUserId" placeholder="User ID">`
         };
 
         const actionDescriptions = {
@@ -769,7 +771,8 @@
             getBalance: "Get the credit balance for the authenticated simulation user.",
             getLedger: "See the full history of credit transactions for the user.",
             getJob: "Fetch detail and result for a specific job.",
-            verifySub: "Simulate an Apple receipt verification call."
+            verifySub: "Simulate an Apple receipt verification call.",
+            checkUser: "Check subscription status, expiration, and credit balance for a user."
         };
 
         function updateForm() {
@@ -833,6 +836,7 @@
                     case 'getLedger': method = 'GET'; url = '/credits/ledger'; break;
                     case 'getJob': url = `/jobs/${document.getElementById('jobId').value}`; method = 'GET'; break;
                     case 'verifySub': method = 'POST'; url = '/auth/subscription/verify'; body = { originalTransactionId: document.getElementById('subTxId').value }; break;
+                    case 'checkUser': method = 'GET'; url = `/admin/user/${document.getElementById('checkUserId').value}/subscription`; break;
                 }
 
                 log(`🚀 ${action === 'createJob' ? 'Job Request Started' : 'Executing ' + action}...`);
