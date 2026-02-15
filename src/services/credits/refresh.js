@@ -122,8 +122,12 @@ class CreditRefreshService {
      * Check if user is eligible for weekly refresh
      * Returns true if 7+ days have passed since last refresh
      */
-    async isEligibleForRefresh(userId, client = null) {
+    async isEligibleForRefresh(userId, client = null, isSandbox = false) {
         const dbClient = client || db;
+
+        // In Sandbox, credits refresh every 3 minutes (approx 5 renewals per 15 mins)
+        // We'll use 2 minutes to be safe/responsive for testing
+        const interval = isSandbox ? '2 minutes' : '7 days';
 
         const result = await dbClient.query(
             `SELECT last_weekly_refresh_at 
@@ -131,7 +135,7 @@ class CreditRefreshService {
              WHERE user_id = $1
              AND (
                last_weekly_refresh_at IS NULL 
-               OR last_weekly_refresh_at < NOW() - INTERVAL '7 days'
+               OR last_weekly_refresh_at < NOW() - INTERVAL '${interval}'
              )`,
             [userId]
         );

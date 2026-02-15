@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
+const jwt = require('jsonwebtoken');
 
 // Kie.ai Webhook
 router.post('/kie', async (req, res) => {
@@ -67,31 +68,81 @@ router.post('/apple', async (req, res) => {
     console.log('Received Apple Webhook:', JSON.stringify(req.body, null, 2));
 
     try {
-        const { notificationType, subtype, data } = req.body;
+        let notificationType, subtype, data;
+        let transactionInfo;
+        let renewalInfo;
 
-        if (!data || !data.signedTransactionInfo) {
-            console.warn('Apple webhook missing required data');
-            return res.status(200).send('OK'); // Still return 200 to prevent retries
+        // Handle App Store Server Notifications V2 (JWS)
+        if (req.body.signedPayload) {
+            try {
+                // Decode top-level JWS
+                const payload = jwt.decode(req.body.signedPayload);
+                if (!payload) throw new Error('Failed to decode signedPayload');
+
+                notificationType = payload.notificationType;
+                subtype = payload.subtype;
+                data = payload.data; // This data contains signedTransactionInfo/signedRenewalInfo
+
+                console.log(`Apple Notification V2: ${notificationType} (${subtype || 'No Subtype'})`);
+
+                if (data) {
+                    // Decode transaction info
+                    if (data.signedTransactionInfo) {
+                        transactionInfo = jwt.decode(data.signedTransactionInfo);
+                    }
+                    // Decode renewal info
+                    if (data.signedRenewalInfo) {
+                        renewalInfo = jwt.decode(data.signedRenewalInfo);
+                    }
+                }
+            } catch (e) {
+                console.error('Failed to decode Apple JWS:', e);
+                return res.status(200).send('OK (Decode Failed)');
+            }
+        } else {
+            // Fallback for older V1 or direct JSON (if any)
+            notificationType = req.body.notificationType;
+            subtype = req.body.subtype;
+            data = req.body.data;
+            // Assume data is already unwrapped in V1 or test payload
+            transactionInfo = data;
         }
 
-        // TODO: Verify JWT signature from Apple for production
-        // For now, we'll process the notification assuming it's valid
+        if (!transactionInfo) {
+            console.warn('Apple webhook missing transaction info');
+            return res.status(200).send('OK');
+        }
+
+        const originalTransactionId = transactionInfo.originalTransactionId;
+        const productId = transactionInfo.productId;
+        const expiresDateMs = transactionInfo.expiresDate || (data && data.expiresDate);
+
+        if (!originalTransactionId) {
+            console.warn('Missing originalTransactionId in webhook');
+            return res.status(200).send('OK');
+        }
 
         const { creditRefreshService } = require('../services/credits/refresh');
 
-        // Extract transaction info (in production, decode the JWT)
-        // For now, assume data contains decoded info or we decode it here
-        const transactionInfo = data.signedTransactionInfo;
-
-        // Map Apple's original transaction ID to our user
-        // This requires storing original_transaction_id in subscriptions table
-        const userResult = await db.query(
-            'SELECT user_id FROM subscriptions WHERE product_id = $1',
-            [transactionInfo.productId || data.bundleId]
+        // Look up user by original_transaction_id (Best) or product_id (Fallback/Risky)
+        let userResult = await db.query(
+            'SELECT user_id FROM subscriptions WHERE original_transaction_id = $1',
+            [originalTransactionId]
         );
 
         if (userResult.rows.length === 0) {
-            console.warn(`No user found for Apple transaction`);
+            console.log(`User not found by original_transaction_id: ${originalTransactionId}. Trying product_id fallback...`);
+            // Fallback: This is risky as multiple users might have same product, 
+            // but might be necessary if we haven't stored original_transaction_id yet.
+            // In a real app, we should probably log this as an error or valid orphaned event.
+            userResult = await db.query(
+                'SELECT user_id FROM subscriptions WHERE product_id = $1',
+                [productId || data.bundleId]
+            );
+        }
+
+        if (userResult.rows.length === 0) {
+            console.warn(`No user found for Apple transaction ${originalTransactionId}`);
             return res.status(200).send('OK');
         }
 
@@ -101,103 +152,99 @@ router.post('/apple', async (req, res) => {
         try {
             await client.query('BEGIN');
 
-            // Handle different notification types
+            // Only update if we have meaningful data
+            const statusUpdate = {
+                status: null,
+                autoRenew: null,
+                expiresAt: expiresDateMs ? new Date(Number(expiresDateMs)) : null
+            };
+
+            // Detect Status based on notification type
             switch (notificationType) {
                 case 'DID_RENEW':
                 case 'INITIAL_BUY':
                 case 'SUBSCRIBED':
-                    console.log(`📱 Apple: Subscription renewed/purchased for user ${userId}`);
-
-                    // Update subscription status
-                    await client.query(
-                        `UPDATE subscriptions 
-                         SET status = 'active', 
-                             auto_renew_status = true,
-                             expires_at = $1,
-                             last_verified_at = NOW()
-                         WHERE user_id = $2`,
-                        [new Date(data.expiresDate || Date.now() + 7 * 24 * 60 * 60 * 1000), userId]
-                    );
-
-                    // Check if eligible for credit refresh (7+ days since last refresh)
-                    const isEligible = await creditRefreshService.isEligibleForRefresh(userId, client);
-
-                    if (isEligible) {
-                        await creditRefreshService.refreshWeeklyCredits(userId, 'refresh', client);
-                    } else {
-                        console.log(`⏭️  User ${userId} not yet eligible for refresh (less than 7 days)`);
+                case 'INTERACTIVE_RENEWAL':
+                    statusUpdate.status = 'active';
+                    statusUpdate.autoRenew = true;
+                    // If we have renewal info, check auto renew status from there
+                    if (renewalInfo && renewalInfo.autoRenewStatus !== undefined) {
+                        statusUpdate.autoRenew = renewalInfo.autoRenewStatus === 1;
                     }
                     break;
 
                 case 'DID_FAIL_TO_RENEW':
                 case 'EXPIRED':
-                    console.log(`⚠️  Apple: Subscription expired/failed for user ${userId}`);
-
-                    // Update subscription status
-                    await client.query(
-                        `UPDATE subscriptions 
-                         SET status = 'expired', 
-                             auto_renew_status = false,
-                             last_verified_at = NOW()
-                         WHERE user_id = $1`,
-                        [userId]
-                    );
-
-                    // Forfeit weekly credits
-                    await creditRefreshService.forfeitWeeklyCredits(userId, 'expiry', client);
+                    statusUpdate.status = 'expired';
+                    statusUpdate.autoRenew = false;
                     break;
 
                 case 'DID_CHANGE_RENEWAL_STATUS':
-                    // User turned auto-renew on/off
-                    const willRenew = subtype === 'AUTO_RENEW_ENABLED';
-                    console.log(`🔄 Apple: Auto-renew ${willRenew ? 'enabled' : 'disabled'} for user ${userId}`);
+                    // Just update auto renew preference
+                    // subtype: AUTO_RENEW_ENABLED / AUTO_RENEW_DISABLED
+                    if (subtype === 'AUTO_RENEW_ENABLED') statusUpdate.autoRenew = true;
+                    if (subtype === 'AUTO_RENEW_DISABLED') statusUpdate.autoRenew = false;
 
-                    await client.query(
-                        `UPDATE subscriptions 
-                         SET auto_renew_status = $1,
-                             last_verified_at = NOW()
-                         WHERE user_id = $2`,
-                        [willRenew, userId]
-                    );
-
-                    // If disabled and subscription will expire, forfeit credits
-                    if (!willRenew) {
-                        const subInfo = await client.query(
-                            'SELECT expires_at FROM subscriptions WHERE user_id = $1',
-                            [userId]
-                        );
-
-                        if (subInfo.rows.length > 0) {
-                            const expiresAt = new Date(subInfo.rows[0].expires_at);
-                            const now = new Date();
-
-                            // If expiring within 24 hours, forfeit now
-                            if (expiresAt - now < 24 * 60 * 60 * 1000) {
-                                await creditRefreshService.forfeitWeeklyCredits(userId, 'expiry', client);
-                            }
-                        }
+                    // Also check renewalInfo if available
+                    if (renewalInfo && renewalInfo.autoRenewStatus !== undefined) {
+                        statusUpdate.autoRenew = renewalInfo.autoRenewStatus === 1;
                     }
                     break;
 
                 case 'REFUND':
-                    console.log(`💸 Apple: Refund issued for user ${userId}`);
-
-                    // Update subscription status
-                    await client.query(
-                        `UPDATE subscriptions 
-                         SET status = 'revoked', 
-                             auto_renew_status = false,
-                             last_verified_at = NOW()
-                         WHERE user_id = $1`,
-                        [userId]
-                    );
-
-                    // Forfeit weekly credits
-                    await creditRefreshService.forfeitWeeklyCredits(userId, 'expiry', client);
+                case 'REVOKE':
+                    statusUpdate.status = 'revoked';
+                    statusUpdate.autoRenew = false;
                     break;
+            }
 
-                default:
-                    console.log(`ℹ️  Apple: Unhandled notification type: ${notificationType}`);
+            console.log(`📱 Apple Webhook: User ${userId} | Type: ${notificationType} | Status: ${statusUpdate.status}`);
+
+            // 1. Update Subscription
+            if (statusUpdate.status || statusUpdate.autoRenew !== null) {
+                let updateQuery = 'UPDATE subscriptions SET last_verified_at = NOW()';
+                const params = [];
+                let paramCount = 1;
+
+                if (statusUpdate.status) {
+                    updateQuery += `, status = $${paramCount++}`;
+                    params.push(statusUpdate.status);
+                }
+                if (statusUpdate.autoRenew !== null) {
+                    updateQuery += `, auto_renew_status = $${paramCount++}`;
+                    params.push(statusUpdate.autoRenew);
+                }
+                if (statusUpdate.expiresAt) {
+                    updateQuery += `, expires_at = $${paramCount++}`;
+                    params.push(statusUpdate.expiresAt);
+                }
+                // Also backfill original_transaction_id if missing
+                updateQuery += `, original_transaction_id = $${paramCount++}`;
+                params.push(originalTransactionId);
+
+                updateQuery += ` WHERE user_id = $${paramCount}`;
+                params.push(userId);
+
+                await client.query(updateQuery, params);
+            }
+
+            // 2. Handle Credits
+            if (['DID_RENEW', 'SUBSCRIBED', 'INITIAL_BUY', 'INTERACTIVE_RENEWAL'].includes(notificationType)) {
+                const isSandbox = (data && data.environment === 'Sandbox');
+
+                // Check eligibility and refresh
+                const isEligible = await creditRefreshService.isEligibleForRefresh(userId, client, isSandbox);
+
+                if (isEligible) {
+                    await creditRefreshService.refreshWeeklyCredits(userId, 'refresh', client);
+                    console.log(`✅ Credits refreshed for User ${userId} (Sandbox: ${isSandbox})`);
+                } else {
+                    console.log(`⏳ User ${userId} not eligible for refresh yet (Sandbox: ${isSandbox})`);
+                }
+            } else if (['EXPIRED', 'DID_FAIL_TO_RENEW', 'REFUND', 'REVOKE'].includes(notificationType)) {
+                // Forfeit credits
+                await creditRefreshService.forfeitWeeklyCredits(userId, 'expiry', client);
+                console.log(`🛑 Credits forfeited for User ${userId}`);
             }
 
             await client.query('COMMIT');
