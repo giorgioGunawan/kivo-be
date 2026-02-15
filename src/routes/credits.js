@@ -8,8 +8,9 @@ router.use(verifyToken);
 router.get('/balance', async (req, res) => {
     try {
         const result = await db.query(
-            `SELECT cb.weekly_remaining, cb.purchased_remaining, cb.weekly_reset_at,
-                    COALESCE(s.status = 'active', false) AS is_pro_subscriber
+            `SELECT cb.weekly_remaining, cb.purchased_remaining, cb.last_weekly_refresh_at,
+                    COALESCE(s.status = 'active', false) AS is_pro_subscriber,
+                    s.expires_at AS subscription_expires_at
              FROM credit_balances cb
              LEFT JOIN subscriptions s ON s.user_id = cb.user_id
              WHERE cb.user_id = $1`,

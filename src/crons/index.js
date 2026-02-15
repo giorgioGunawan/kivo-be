@@ -1,64 +1,44 @@
 const cron = require('node-cron');
 const db = require('../config/db');
-const { creditLedgerService } = require('../services/credits/ledger');
+const { creditRefreshService } = require('../services/credits/refresh');
 
-// Weekly Credit Refresh Task
+// Safety Net: Catch Missed Webhook Deliveries
+// Runs daily to ensure no users are missed due to webhook failures
 cron.schedule('0 0 * * *', async () => {
-    console.log('Running Weekly Credit Refresh Task');
+    console.log('🔍 Running Credit Refresh Safety Net (Webhook Failure Recovery)');
     const client = await db.pool.connect();
     try {
-        // Determine Weekly Allocation (default 500)
-        const configRes = await client.query("SELECT value FROM admin_config WHERE key = 'weekly_allocation'");
-        const allocation = configRes.rows.length ? configRes.rows[0].value : 500;
+        // Find users who should have been refreshed but weren't
+        // Criteria:
+        // 1. Active subscription
+        // 2. Auto-renew enabled
+        // 3. Last refresh was 8+ days ago (7 days + 1 day buffer for webhook delays)
+        const missedRefreshes = await client.query(`
+            SELECT cb.user_id, cb.last_weekly_refresh_at, s.expires_at
+            FROM credit_balances cb
+            JOIN subscriptions s ON s.user_id = cb.user_id
+            WHERE s.status = 'active'
+              AND s.expires_at > NOW()
+              AND s.auto_renew_status = true
+              AND cb.last_weekly_refresh_at < NOW() - INTERVAL '8 days'
+        `);
 
-        // Find eligible users: Active subscription AND reset time passed
-        const q = `
-      SELECT cb.user_id, cb.weekly_reset_at 
-      FROM credit_balances cb
-      JOIN subscriptions s ON s.user_id = cb.user_id
-      WHERE s.status = 'active'
-        AND cb.weekly_reset_at <= NOW()
-    `;
-        const users = await client.query(q);
+        if (missedRefreshes.rows.length === 0) {
+            console.log('✅ No missed refreshes detected');
+        } else {
+            console.warn(`⚠️  Found ${missedRefreshes.rows.length} users with missed refreshes`);
 
-        console.log(`Found ${users.rows.length} users for credit refresh`);
-
-        for (const user of users.rows) {
-            try {
-                await client.query('BEGIN');
-
-                // Reset balance to allocation (not add, reset!)
-                // Spec: "weekly_remaining = WEEKLY_ALLOCATION".
-                // But need ledger history.
-                // Current balance?
-                const currentRes = await client.query('SELECT weekly_remaining FROM credit_balances WHERE user_id = $1', [user.user_id]);
-                const current = currentRes.rows[0]?.weekly_remaining || 0;
-
-                const delta = allocation - current;
-
-                if (delta !== 0) {
-                    await creditLedgerService.createEntry({
-                        userId: user.user_id,
-                        poolType: 'weekly',
-                        delta, // Can be positive or negative (if current > allocation? unlikely unless error, but resets to cap)
-                        reason: 'refresh'
-                    }, client);
+            for (const user of missedRefreshes.rows) {
+                try {
+                    console.warn(`🔧 Recovering missed refresh for user ${user.user_id} (last refresh: ${user.last_weekly_refresh_at})`);
+                    await creditRefreshService.refreshWeeklyCredits(user.user_id, 'refresh');
+                } catch (err) {
+                    console.error(`❌ Failed to recover refresh for user ${user.user_id}:`, err);
                 }
-
-                // Update reset time + 7 days
-                await client.query(
-                    `UPDATE credit_balances SET weekly_reset_at = weekly_reset_at + INTERVAL '7 days' WHERE user_id = $1`,
-                    [user.user_id]
-                );
-
-                await client.query('COMMIT');
-            } catch (err) {
-                await client.query('ROLLBACK');
-                console.error(`Failed to refresh user ${user.user_id}`, err);
             }
         }
     } catch (e) {
-        console.error('Cron Error', e);
+        console.error('❌ Safety Net Cron Error:', e);
     } finally {
         client.release();
     }

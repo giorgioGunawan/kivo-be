@@ -63,24 +63,46 @@ router.post('/subscription/verify', async (req, res) => {
 
     try {
         const result = await verifySubscription(originalTransactionId);
+        const { creditRefreshService } = require('../services/credits/refresh');
 
-        await db.query(
-            `INSERT INTO subscriptions (user_id, product_id, status, expires_at, last_verified_at)
-             VALUES ($1, $2, $3, to_timestamp($4 / 1000.0), NOW())
-             ON CONFLICT (user_id) 
-             DO UPDATE SET status = EXCLUDED.status, expires_at = EXCLUDED.expires_at, last_verified_at = NOW()`,
-            [userId, result.productId, result.status, result.expiresDate]
-        );
+        const client = await db.pool.connect();
+        try {
+            await client.query('BEGIN');
 
-        // If newly active, trigger credit refresh logic?
-        // Spec says: "Refresh logic (executed on generation request, balance fetch, or cron)"
-        // But also "Weekly Credits ... Forfeited immediately on subscription expiry"
-        // "Reactivation restarts weekly cycle using new anchor"
+            // Update subscription status
+            await client.query(
+                `INSERT INTO subscriptions (user_id, product_id, status, expires_at, auto_renew_status, last_verified_at)
+                 VALUES ($1, $2, $3, to_timestamp($4 / 1000.0), true, NOW())
+                 ON CONFLICT (user_id) 
+                 DO UPDATE SET 
+                    status = EXCLUDED.status, 
+                    expires_at = EXCLUDED.expires_at, 
+                    auto_renew_status = true,
+                    last_verified_at = NOW()`,
+                [userId, result.productId, result.status, result.expiresDate]
+            );
 
-        // Update anchor if NEW subscription start? 
-        // This logic is complex, simplistic for now: just update status.
+            // If subscription is active, check if eligible for credit refresh
+            if (result.status === 'active') {
+                const isEligible = await creditRefreshService.isEligibleForRefresh(userId, client);
 
-        res.json({ success: true, status: result.status });
+                if (isEligible) {
+                    await creditRefreshService.refreshWeeklyCredits(userId, 'refresh', client);
+                    console.log(`✅ Refreshed credits for user ${userId} via manual verification`);
+                }
+            } else if (result.status === 'expired') {
+                // Forfeit weekly credits if subscription expired
+                await creditRefreshService.forfeitWeeklyCredits(userId, 'expiry', client);
+            }
+
+            await client.query('COMMIT');
+            res.json({ success: true, status: result.status });
+        } catch (e) {
+            await client.query('ROLLBACK');
+            throw e;
+        } finally {
+            client.release();
+        }
     } catch (e) {
         console.error(e);
         res.status(500).json({ error: 'Verification failed' });

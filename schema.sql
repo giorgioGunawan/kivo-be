@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
     product_id VARCHAR(255),
     status VARCHAR(50) NOT NULL, -- active, expired, revoked
     expires_at TIMESTAMP WITH TIME ZONE,
+    auto_renew_status BOOLEAN DEFAULT true,
     last_verified_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -29,7 +30,7 @@ CREATE TABLE IF NOT EXISTS credit_balances (
     user_id INTEGER PRIMARY KEY REFERENCES users(id),
     weekly_remaining INTEGER DEFAULT 0,
     purchased_remaining INTEGER DEFAULT 0,
-    weekly_reset_at TIMESTAMP WITH TIME ZONE
+    last_weekly_refresh_at TIMESTAMP WITH TIME ZONE
 );
 
 CREATE TABLE IF NOT EXISTS jobs (
