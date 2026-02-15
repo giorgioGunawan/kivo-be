@@ -47,7 +47,7 @@ cron.schedule('0 0 * * *', async () => {
 // Subscription Cleanup Task (Hourly)
 // Checks for subscriptions that according to our DB should have expired but are still marked 'active'.
 // This acts as a safety against missed 'EXPIRED' webhooks.
-cron.schedule('0 * * * *', async () => {
+const runSubscriptionCleanup = async () => {
     console.log('Running Subscription Cleanup Task (Expired Active Subs Check)');
     const client = await db.pool.connect();
 
@@ -207,4 +207,8 @@ cron.schedule('0 * * * *', async () => {
     } finally {
         client.release();
     }
-});
+};
+
+cron.schedule('0 * * * *', runSubscriptionCleanup);
+
+module.exports = { runSubscriptionCleanup };

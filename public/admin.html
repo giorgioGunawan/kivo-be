@@ -373,7 +373,7 @@
             <div class="tab active" onclick="switchTab('simulator')">Simulator & Logs</div>
             <div class="tab" onclick="switchTab('queue')">Job Queue</div>
             <div class="tab" onclick="switchTab('database')">Database Browser</div>
-            <div class="tab" onclick="switchTab('systemLogs')">System Logs</div>
+            <div class="tab" onclick="switchTab('systemLogs')">Cron Logs</div>
         </div>
 
         <!-- Simulator Pane -->
@@ -511,8 +511,11 @@
             <div id="systemLogsPane" class="pane">
                 <div class="card">
                     <div class="card-header">
-                        <h3>📜 System Event Logs</h3>
-                        <button class="secondary" onclick="fetchSystemLogs()">Refresh Logs</button>
+                        <h3>📜 Cron Logs</h3>
+                        <div style="display:flex; gap:10px">
+                            <button class="secondary" onclick="runCronCleanup()">⚡ Run Cleanup Task</button>
+                            <button class="secondary" onclick="fetchSystemLogs()">Refresh Logs</button>
+                        </div>
                     </div>
                     <div class="table-scroll">
                         <table id="systemLogsTable">
@@ -540,6 +543,30 @@
     <script>
         const API_URL = window.location.origin;
         let adminPassword = '';
+
+        async function runCronCleanup() {
+            if (!confirm('Run the subscription cleanup task manually? This will verify expired active subscriptions with Apple.')) return;
+            try {
+                const btn = event.target;
+                const oldText = btn.textContent;
+                btn.textContent = 'Running...';
+                btn.disabled = true;
+
+                const res = await fetch(`${API_URL}/admin/cron/run-cleanup`, {
+                    method: 'POST',
+                    headers: { 'x-admin-password': adminPassword }
+                });
+                const data = await res.json();
+
+                alert(data.success ? 'Task Completed Successfully' : 'Task Failed');
+                fetchSystemLogs();
+
+                btn.textContent = oldText;
+                btn.disabled = false;
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
 
         // --- Auth Gateway ---
         function checkAdminLogin() {

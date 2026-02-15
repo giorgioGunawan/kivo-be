@@ -176,4 +176,18 @@ router.post('/db/cleanup-failed-jobs', async (req, res) => {
     }
 });
 
+// Manual Cron Trigger
+router.post('/cron/run-cleanup', async (req, res) => {
+    try {
+        const { runSubscriptionCleanup } = require('../crons/index');
+        // Run in background so we don't timeout the request, or await if fast enough. 
+        // Better to await to give feedback.
+        await runSubscriptionCleanup();
+        res.json({ success: true, message: 'Cleanup task executed' });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Task failed' });
+    }
+});
+
 module.exports = router;
