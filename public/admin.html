@@ -506,35 +506,35 @@
                     </div>
                 </div>
             </div>
+        </div>
 
-            <!-- System Logs Pane -->
-            <div id="systemLogsPane" class="pane">
-                <div class="card">
-                    <div class="card-header">
-                        <h3>📜 Cron Logs</h3>
-                        <div style="display:flex; gap:10px">
-                            <button class="secondary" onclick="runCronCleanup()">⚡ Run Cleanup Task</button>
-                            <button class="secondary" onclick="fetchSystemLogs()">Refresh Logs</button>
-                        </div>
+        <!-- System Logs Pane -->
+        <div id="systemLogsPane" class="pane">
+            <div class="card">
+                <div class="card-header">
+                    <h3>📜 Cron Logs</h3>
+                    <div style="display:flex; gap:10px">
+                        <button class="secondary" onclick="runCronCleanup()">⚡ Run Cleanup Task</button>
+                        <button class="secondary" onclick="fetchSystemLogs()">Refresh Logs</button>
                     </div>
-                    <div class="table-scroll">
-                        <table id="systemLogsTable">
-                            <thead>
-                                <tr>
-                                    <th>Time</th>
-                                    <th>Event</th>
-                                    <th>Level</th>
-                                    <th>Message</th>
-                                    <th>Details</th>
-                                </tr>
-                            </thead>
-                            <tbody id="systemLogsBody">
-                                <tr>
-                                    <td colspan="5" style="text-align:center; padding:20px">Loading...</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                </div>
+                <div class="table-scroll">
+                    <table id="systemLogsTable">
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Event</th>
+                                <th>Level</th>
+                                <th>Message</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody id="systemLogsBody">
+                            <tr>
+                                <td colspan="5" style="text-align:center; padding:20px">Loading...</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
