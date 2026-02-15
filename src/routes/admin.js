@@ -2,6 +2,22 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const { verifyAdmin } = require('../middleware/auth');
+const { creditLedgerService } = require('../services/credits/ledger'); // Moved up for consistency
+
+// Fetch System Logs
+router.get('/logs', async (req, res) => {
+    try {
+        const limit = parseInt(req.query.limit) || 100;
+        const result = await db.query(
+            'SELECT * FROM system_logs ORDER BY created_at DESC LIMIT $1',
+            [limit]
+        );
+        res.json(result.rows);
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Failed to fetch logs' });
+    }
+});
 
 router.use(verifyAdmin);
 

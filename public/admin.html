@@ -373,6 +373,7 @@
             <div class="tab active" onclick="switchTab('simulator')">Simulator & Logs</div>
             <div class="tab" onclick="switchTab('queue')">Job Queue</div>
             <div class="tab" onclick="switchTab('database')">Database Browser</div>
+            <div class="tab" onclick="switchTab('systemLogs')">System Logs</div>
         </div>
 
         <!-- Simulator Pane -->
@@ -505,6 +506,34 @@
                     </div>
                 </div>
             </div>
+
+            <!-- System Logs Pane -->
+            <div id="systemLogsPane" class="pane">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>📜 System Event Logs</h3>
+                        <button class="secondary" onclick="fetchSystemLogs()">Refresh Logs</button>
+                    </div>
+                    <div class="table-scroll">
+                        <table id="systemLogsTable">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Event</th>
+                                    <th>Level</th>
+                                    <th>Message</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody id="systemLogsBody">
+                                <tr>
+                                    <td colspan="5" style="text-align:center; padding:20px">Loading...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -540,25 +569,64 @@
 
         // --- Tabs ---
         function switchTab(tabId) {
+            // Remove active from all tabs and panes
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
 
-            // Find the tab element corresponding to the tabId
-            // Simpler: just loop tabs and see if onclick matches or use index.
-            // But here I can just use event.target if triggered by click.
-            if (event && event.target && event.target.classList.contains('tab')) {
-                event.target.classList.add('active');
-            } else {
-                // Manual switch fallback
-                const tabs = document.querySelectorAll('.tab');
-                if (tabId === 'simulator') tabs[0].classList.add('active');
-                if (tabId === 'queue') tabs[1].classList.add('active');
-                if (tabId === 'database') tabs[2].classList.add('active');
-            }
+            // Activate clicked tab via event (if available) or by matching text/content
+            // Better: Find tab by index or attribute. Simple way:
+            const tabs = document.querySelectorAll('.tab');
+            if (tabId === 'simulator') tabs[0].classList.add('active');
+            if (tabId === 'queue') tabs[1].classList.add('active');
+            if (tabId === 'database') tabs[2].classList.add('active');
+            if (tabId === 'systemLogs') tabs[3].classList.add('active');
 
-            document.getElementById(`${tabId}Pane`).classList.add('active');
+            const pane = document.getElementById(`${tabId}Pane`);
+            if (pane) pane.classList.add('active');
 
             if (tabId === 'queue') fetchQueueStatus();
+            if (tabId === 'systemLogs') fetchSystemLogs();
+        }
+
+        // --- System Logs ---
+        async function fetchSystemLogs() {
+            const tbody = document.getElementById('systemLogsBody');
+            tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:#64748b">Loading entries...</td></tr>';
+            try {
+                const res = await fetch(`${API_URL}/admin/logs?limit=50`, {
+                    headers: { 'x-admin-password': adminPassword }
+                });
+                const logs = await res.json();
+
+                if (logs.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:#64748b">No logs found</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = logs.map(log => {
+                    const date = new Date(log.created_at).toLocaleString();
+                    let levelColor = '#3b82f6'; // info
+                    if (log.level === 'warn') levelColor = '#f59e0b';
+                    if (log.level === 'error') levelColor = '#ef4444';
+
+                    return `
+                        <tr>
+                            <td style="font-size:12px; white-space:nowrap; color:#64748b">${date}</td>
+                            <td style="font-weight:600; font-size:13px">${log.event_type}</td>
+                            <td><span style="background:${levelColor}20; color:${levelColor}; padding:2px 6px; border-radius:4px; font-size:11px; font-weight:700; text-transform:uppercase">${log.level}</span></td>
+                            <td>${log.message}</td>
+                            <td>
+                                <div style="font-family:monospace; font-size:11px; max-width:300px; max-height:60px; overflow:auto; background:#f1f5f9; padding:4px; border-radius:4px">
+                                    ${JSON.stringify(log.details || {}, null, 2)}
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="5" style="color:red; text-align:center">Error: ${e.message}</td></tr>`;
+            }
         }
 
         // --- Queue Logic ---
