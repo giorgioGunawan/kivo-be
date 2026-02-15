@@ -13,11 +13,11 @@ class CreditRefreshService {
         try {
             if (shouldManageTransaction) await dbClient.query('BEGIN');
 
-            // Get weekly allocation from config (default 500)
+            // Get weekly allocation from config (default 1500)
             const configRes = await dbClient.query(
                 "SELECT value FROM admin_config WHERE key = 'weekly_allocation'"
             );
-            const allocation = configRes.rows.length ? parseInt(configRes.rows[0].value) : 500;
+            const allocation = configRes.rows.length ? parseInt(configRes.rows[0].value) : 1500;
 
             // Get current weekly balance
             const balanceRes = await dbClient.query(
