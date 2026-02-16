@@ -68,6 +68,7 @@ router.post('/subscription/verify', async (req, res) => {
 
     const { originalTransactionId, environment, transactionId, productId: bodyProductId } = req.body;
 
+    let client;
     try {
         // If it's a known credit product, skip subscription verification and handle as top-up
         if (bodyProductId && PRODUCT_CREDITS[bodyProductId]) {
@@ -127,6 +128,8 @@ router.post('/subscription/verify', async (req, res) => {
         // --- Existing Subscription Verification Logic ---
         // SAFE VERIFICATION LOGIC (Fix for Mock "Free Credits" Loop)
         // 1. Check existing subscription in DB
+        client = await db.pool.connect();
+        await client.query('BEGIN');
         const existingSubRes = await client.query('SELECT * FROM subscriptions WHERE user_id = $1', [userId]);
         const existingSub = existingSubRes.rows[0];
 
@@ -134,6 +137,7 @@ router.post('/subscription/verify', async (req, res) => {
         if (existingSub && existingSub.status === 'active' && new Date(existingSub.expires_at) > new Date()) {
             console.log(`User ${userId} already has active subscription. Skipping mock verification.`);
             await client.query('COMMIT');
+            client.release();
             return res.json({ success: true, status: 'active', expiresAt: existingSub.expires_at });
         }
 
@@ -177,6 +181,7 @@ router.post('/subscription/verify', async (req, res) => {
         }
 
         await client.query('COMMIT');
+        client.release();
         res.json({ success: true, status: result.status });
 
     } catch (e) {
