@@ -1,6 +1,12 @@
 const db = require('../../config/db');
 const { creditLedgerService } = require('./ledger');
 
+const SUBSCRIPTION_CREDITS = {
+    'com.kivoai.weekly': 500,
+    'com.kivoai.weekly.discounted': 500,
+    'com.kivoai.monthly': 1500,
+};
+
 class CreditRefreshService {
     /**
      * Refresh weekly credits for a user
@@ -13,11 +19,13 @@ class CreditRefreshService {
         try {
             if (shouldManageTransaction) await dbClient.query('BEGIN');
 
-            // Get weekly allocation from config (default 1500)
-            const configRes = await dbClient.query(
-                "SELECT value FROM admin_config WHERE key = 'weekly_allocation'"
+            // Determine allocation from the user's subscription product
+            const subRes = await dbClient.query(
+                'SELECT product_id FROM subscriptions WHERE user_id = $1',
+                [userId]
             );
-            const allocation = configRes.rows.length ? parseInt(configRes.rows[0].value) : 1500;
+            const productId = subRes.rows[0]?.product_id;
+            const allocation = SUBSCRIPTION_CREDITS[productId] ?? 500;
 
             // Get current weekly balance
             const balanceRes = await dbClient.query(
