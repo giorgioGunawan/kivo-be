@@ -218,7 +218,11 @@ router.post('/apple', async (req, res) => {
                     updateQuery += `, expires_at = $${paramCount++}`;
                     params.push(statusUpdate.expiresAt);
                 }
-                // Also backfill original_transaction_id if missing
+                // Also backfill/update product_id and original_transaction_id
+                if (productId) {
+                    updateQuery += `, product_id = $${paramCount++}`;
+                    params.push(productId);
+                }
                 updateQuery += `, original_transaction_id = $${paramCount++}`;
                 params.push(originalTransactionId);
 

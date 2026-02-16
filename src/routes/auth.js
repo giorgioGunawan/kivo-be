@@ -158,9 +158,10 @@ router.post('/subscription/verify', async (req, res) => {
             `INSERT INTO subscriptions (user_id, product_id, status, expires_at, auto_renew_status, last_verified_at, original_transaction_id)
              VALUES ($1, $2, $3, to_timestamp($4 / 1000.0), true, NOW(), $5)
              ON CONFLICT (user_id) 
-             DO UPDATE SET 
-                status = EXCLUDED.status, 
-                expires_at = EXCLUDED.expires_at, 
+             DO UPDATE SET
+                product_id = EXCLUDED.product_id,
+                status = EXCLUDED.status,
+                expires_at = EXCLUDED.expires_at,
                 auto_renew_status = true,
                 last_verified_at = NOW(),
                 original_transaction_id = EXCLUDED.original_transaction_id`,
