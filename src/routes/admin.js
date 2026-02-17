@@ -190,4 +190,29 @@ router.post('/cron/run-cleanup', async (req, res) => {
     }
 });
 
+// Support Dashboard Data
+router.get('/support/users', async (req, res) => {
+    try {
+        const result = await db.query(`
+            SELECT 
+                u.id as user_id,
+                u.email,
+                s.product_id,
+                s.status as sub_status,
+                s.expires_at,
+                COALESCE(c.weekly_remaining, 0) as weekly_credits,
+                COALESCE(c.purchased_remaining, 0) as purchased_credits
+            FROM users u
+            LEFT JOIN subscriptions s ON u.id = s.user_id
+            LEFT JOIN credit_balances c ON u.id = c.user_id
+            ORDER BY s.expires_at DESC NULLS LAST
+            LIMIT 50
+        `);
+        res.json(result.rows);
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Failed to fetch support data' });
+    }
+});
+
 module.exports = router;
