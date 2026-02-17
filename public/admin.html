@@ -1044,6 +1044,18 @@
                         html += '<tr>';
                         headers.forEach(h => {
                             let val = row[h];
+
+                            // Convert dates for specific columns to Australian Time
+                            if (val && (h === 'expires_at' || h === 'last_verified_at')) {
+                                try {
+                                    val = new Date(val).toLocaleString('en-AU', {
+                                        timeZone: 'Australia/Sydney',
+                                        year: 'numeric', month: 'short', day: 'numeric',
+                                        hour: '2-digit', minute: '2-digit', second: '2-digit',
+                                        hour12: true
+                                    });
+                                } catch (e) { }
+                            }
                             if (val && typeof val === 'string' && (val.startsWith('http') || val.startsWith('/uploads'))) {
                                 const isImage = /\.(jpg|jpeg|png|webp|gif|avif)($|\?)/i.test(val) || h.includes('image') || h.includes('url');
                                 const isVideo = /\.(mp4|webm|mov)($|\?)/i.test(val) || h.includes('video');
