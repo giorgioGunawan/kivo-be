@@ -196,7 +196,7 @@ router.get('/support/users', async (req, res) => {
         const result = await db.query(`
             SELECT 
                 u.id as user_id,
-                u.email,
+                u.apple_user_id,
                 s.product_id,
                 s.status as sub_status,
                 s.expires_at,
