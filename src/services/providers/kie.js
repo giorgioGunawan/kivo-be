@@ -92,6 +92,12 @@ const KieProvider = {
                 image_size: jobData.image_size || jobData.jobParams?.image_size || 'auto',
                 output_format: jobData.output_format || jobData.jobParams?.output_format || 'png'
             };
+        } else if (model === 'google/nano-banana') {
+            inputPayload = {
+                prompt: jobData.prompt || jobData.jobParams?.prompt,
+                image_size: jobData.image_size || jobData.jobParams?.image_size || '1:1',
+                output_format: jobData.output_format || jobData.jobParams?.output_format || 'png'
+            };
         } else {
             inputPayload = {
                 prompt: jobData.prompt || jobData.jobParams?.prompt,
