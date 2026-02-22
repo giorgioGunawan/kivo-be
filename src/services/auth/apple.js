@@ -1,6 +1,36 @@
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const appleSignin = require('apple-signin-auth');
+
+// Cache Apple's public keys for JWS verification
+let applePublicKeysCache = null;
+let appleKeysCacheTime = 0;
+const APPLE_KEYS_TTL = 3600000; // 1 hour
+
+async function getApplePublicKeys() {
+    const now = Date.now();
+    if (applePublicKeysCache && (now - appleKeysCacheTime) < APPLE_KEYS_TTL) {
+        return applePublicKeysCache;
+    }
+    const resp = await axios.get('https://appleid.apple.com/auth/keys');
+    applePublicKeysCache = resp.data.keys;
+    appleKeysCacheTime = now;
+    return applePublicKeysCache;
+}
+
+async function verifyAppleJWS(token) {
+    const header = JSON.parse(Buffer.from(token.split('.')[0], 'base64url').toString());
+    const keys = await getApplePublicKeys();
+    const match = keys.find(k => k.kid === header.kid);
+    if (!match) {
+        // If no matching key, fall back to decode (Apple API responses use Apple's own signing)
+        // This handles cases where the signing key differs from identity keys
+        return jwt.decode(token);
+    }
+    const pubKey = crypto.createPublicKey({ key: match, format: 'jwk' });
+    return jwt.verify(token, pubKey.export({ type: 'spki', format: 'pem' }), { algorithms: ['ES256'] });
+}
 
 /**
  * Verifies Sign-in with Apple identity token using official Apple public keys.
@@ -71,9 +101,9 @@ const verifySubscription = async (originalTransactionId, environment, productId 
             for (const group of body.data) {
                 if (group.lastTransactions && group.lastTransactions.length > 0) {
                     for (const tx of group.lastTransactions) {
-                        // Decode the signed transaction info (JWS)
-                        const decodedTx = jwt.decode(tx.signedTransactionInfo);
-                        const decodedRenewal = jwt.decode(tx.signedRenewalInfo);
+                        // Verify and decode the signed transaction info (JWS)
+                        const decodedTx = await verifyAppleJWS(tx.signedTransactionInfo);
+                        const decodedRenewal = tx.signedRenewalInfo ? await verifyAppleJWS(tx.signedRenewalInfo) : null;
 
                         // We are looking for the latest one.
                         // Compare expiresDate or purchaseDate

@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../config/db');
 const jwt = require('jsonwebtoken');
 const { verifyAppleIdToken, verifySubscription } = require('../services/auth/apple');
+const { verifyToken } = require('../middleware/auth');
 
 // Sign In with Apple
 router.post('/apple', async (req, res) => {
@@ -98,15 +99,19 @@ router.post('/subscription/verify', async (req, res) => {
                     return res.json({ success: true, creditsAdded: 0, type: 'consumable', duplicate: true });
                 }
 
-                // Enforce Max Credit Limit (2000) for Purchased Pool
+                // Enforce Max Credit Limit for Purchased Pool
+                const MAX_PURCHASED = 2000;
                 const balanceRes = await client.query(
                     'SELECT purchased_remaining FROM credit_balances WHERE user_id = $1 FOR UPDATE',
                     [userId]
                 );
                 const currentPurchased = balanceRes.rows[0]?.purchased_remaining || 0;
 
-                if (currentPurchased + creditAmount > 2000) {
-                    console.warn(`User ${userId} attempted top-up but would exceed 2000 limit (${currentPurchased} + ${creditAmount})`);
+                if (currentPurchased + creditAmount > MAX_PURCHASED) {
+                    await client.query('COMMIT');
+                    client.release();
+                    console.warn(`User ${userId} top-up rejected: would exceed ${MAX_PURCHASED} limit (${currentPurchased} + ${creditAmount})`);
+                    return res.status(400).json({ error: 'Purchased credit limit reached' });
                 }
 
                 await creditLedgerService.createEntry({
@@ -200,6 +205,36 @@ router.post('/subscription/verify', async (req, res) => {
         }
         console.error(e);
         res.status(500).json({ error: 'Verification failed' });
+    }
+});
+
+// Delete Account (Permanent)
+router.delete('/user', verifyToken, async (req, res) => {
+    const userId = req.user.id;
+    const client = await db.pool.connect();
+
+    try {
+        await client.query('BEGIN');
+
+        // Delete in FK-safe order
+        await client.query('DELETE FROM idempotency_keys WHERE user_id = $1', [userId]);
+        await client.query('DELETE FROM webhook_events WHERE user_id = $1', [userId]);
+        await client.query('DELETE FROM processed_transactions WHERE user_id = $1', [userId]);
+        await client.query('DELETE FROM credit_ledger WHERE user_id = $1', [userId]);
+        await client.query('DELETE FROM credit_balances WHERE user_id = $1', [userId]);
+        await client.query('DELETE FROM jobs WHERE user_id = $1', [userId]);
+        await client.query('DELETE FROM subscriptions WHERE user_id = $1', [userId]);
+        await client.query('DELETE FROM users WHERE id = $1', [userId]);
+
+        await client.query('COMMIT');
+        console.log(`Account deleted permanently for user ${userId}`);
+        res.json({ success: true, message: 'Account permanently deleted' });
+    } catch (e) {
+        await client.query('ROLLBACK');
+        console.error(`Account deletion failed for user ${userId}:`, e.message);
+        res.status(500).json({ error: 'Account deletion failed' });
+    } finally {
+        client.release();
     }
 });
 

@@ -58,6 +58,22 @@ const adminLimiter = rateLimit({
     message: { error: 'Too many requests' }
 });
 
+const deleteLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 3,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many deletion requests, please try again later' }
+});
+
+const generationLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many generation requests, please try again later' }
+});
+
 app.get('/', (req, res) => {
     res.send('Kivo AI Backend is running 🚀');
 });
@@ -71,6 +87,8 @@ app.use('/auth/apple', authLimiter);
 app.use('/auth/subscription/verify', verifyLimiter);
 app.use('/webhooks', webhookLimiter);
 app.use('/admin', adminLimiter);
+app.delete('/auth/user', deleteLimiter);
+app.post('/jobs', generationLimiter);
 
 // Routes
 app.use('/auth', authRoutes);

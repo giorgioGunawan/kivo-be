@@ -5,12 +5,13 @@ const db = require('../config/db'); // Needed for idempotency key insert?
 // Or controller handles idempotency insert.
 const jobManager = require('../services/jobs/manager');
 const { verifyToken } = require('../middleware/auth');
+const { contentFilter } = require('../middleware/contentFilter');
 const idempotency = require('../middleware/idempotency');
 
 router.use(verifyToken);
 
 // Create Job
-router.post('/', idempotency, async (req, res) => {
+router.post('/', contentFilter, idempotency, async (req, res) => {
     const { media_type, template_id, ...params } = req.body;
     const key = req.headers['idempotency-key']; // Should be present due to middleware, or ignored if middleware didn't error.
 
@@ -26,17 +27,7 @@ router.post('/', idempotency, async (req, res) => {
         // For now, doing it separately but immediately after creation is risky but acceptable for MVP.
         // If jobManager returns job, we insert key.
 
-        const result = await jobManager.createJob(req.user.id, media_type, params, template_id);
-
-        // Save Idempotency Key (Ideally inside manager transaction)
-        if (key) {
-            await db.query(
-                `INSERT INTO idempotency_keys (key, user_id, endpoint, request_hash, job_id, expires_at)
-             VALUES ($1, $2, $3, $4, $5, NOW() + INTERVAL '24 hours')
-             ON CONFLICT (key) DO NOTHING`,
-                [key, req.user.id, req.originalUrl, JSON.stringify(req.body), result.jobId]
-            );
-        }
+        const result = await jobManager.createJob(req.user.id, media_type, params, template_id, key);
 
         res.status(201).json(result);
     } catch (error) {

@@ -4,7 +4,7 @@ const { creditLedgerService } = require('../credits/ledger');
 const { getProvider, activeProvider } = require('../providers/index');
 
 class JobManagerService {
-    async createJob(userId, mediaType, userParams, templateId = null) {
+    async createJob(userId, mediaType, userParams, templateId = null, idempotencyKey = null) {
         const client = await db.pool.connect();
 
         // 1. Estimate Cost
@@ -46,6 +46,16 @@ class JobManagerService {
                 `UPDATE jobs SET status = 'queued' WHERE id = $1`,
                 [jobId]
             );
+
+            // Save idempotency key inside the same transaction
+            if (idempotencyKey) {
+                await client.query(
+                    `INSERT INTO idempotency_keys (key, user_id, endpoint, request_hash, job_id, expires_at)
+                     VALUES ($1, $2, 'jobs', $3, $4, NOW() + INTERVAL '24 hours')
+                     ON CONFLICT (key) DO NOTHING`,
+                    [idempotencyKey, userId, JSON.stringify(userParams), jobId]
+                );
+            }
 
             await client.query('COMMIT');
             return { jobId, status: 'queued', estimatedCost };

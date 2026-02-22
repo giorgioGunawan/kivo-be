@@ -1,4 +1,6 @@
 const cron = require('node-cron');
+const fs = require('fs');
+const path = require('path');
 const db = require('../config/db');
 const { creditRefreshService } = require('../services/credits/refresh');
 
@@ -210,5 +212,32 @@ const runSubscriptionCleanup = async () => {
 };
 
 cron.schedule('0 * * * *', runSubscriptionCleanup);
+
+// Upload Cleanup: Delete temp files older than 1 hour
+cron.schedule('30 * * * *', async () => {
+    const uploadsDir = path.join(process.cwd(), 'public/uploads');
+    if (!fs.existsSync(uploadsDir)) return;
+
+    const now = Date.now();
+    const ONE_HOUR = 60 * 60 * 1000;
+    let cleaned = 0;
+
+    try {
+        const files = fs.readdirSync(uploadsDir);
+        for (const file of files) {
+            const filePath = path.join(uploadsDir, file);
+            const stat = fs.statSync(filePath);
+            if (now - stat.mtimeMs > ONE_HOUR) {
+                fs.unlinkSync(filePath);
+                cleaned++;
+            }
+        }
+        if (cleaned > 0) {
+            console.log(`[UploadCleanup] Deleted ${cleaned} expired upload(s)`);
+        }
+    } catch (e) {
+        console.error('[UploadCleanup] Error:', e.message);
+    }
+});
 
 module.exports = { runSubscriptionCleanup };
