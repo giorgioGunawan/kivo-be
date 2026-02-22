@@ -3,6 +3,26 @@ const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
 
+async function runMigrations(client) {
+    const migrationsDir = path.join(__dirname, '../migrations');
+    if (!fs.existsSync(migrationsDir)) return;
+
+    const files = fs.readdirSync(migrationsDir)
+        .filter(f => f.endsWith('.sql'))
+        .sort();
+
+    for (const file of files) {
+        try {
+            const sql = fs.readFileSync(path.join(migrationsDir, file), 'utf8');
+            await client.query(sql);
+            console.log(`Migration applied: ${file}`);
+        } catch (err) {
+            // IF NOT EXISTS clauses make these safe to re-run
+            console.log(`Migration ${file}: ${err.message.includes('already exists') ? 'already applied' : err.message}`);
+        }
+    }
+}
+
 async function initDb() {
     // If DATABASE_URL is present (e.g. Railway/Render), use it directly
     if (process.env.DATABASE_URL) {
@@ -14,6 +34,7 @@ async function initDb() {
             const schemaSql = fs.readFileSync(schemaPath, 'utf8');
             await client.query(schemaSql);
             console.log('Schema applied successfully to production DB!');
+            await runMigrations(client);
             return;
         } catch (err) {
             console.error('Failed to initialize production database:', err.message);
@@ -73,6 +94,7 @@ async function initDb() {
 
         await dbClient.query(schemaSql);
         console.log('Schema applied successfully!');
+        await runMigrations(dbClient);
     } catch (err) {
         console.error('Failed the initialize database:', err.message);
         process.exit(1);

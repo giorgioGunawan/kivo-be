@@ -4,10 +4,13 @@ const db = require('../config/db');
 const { verifyAdmin } = require('../middleware/auth');
 const { creditLedgerService } = require('../services/credits/ledger'); // Moved up for consistency
 
+// SECURITY: All admin routes require authentication
+router.use(verifyAdmin);
+
 // Fetch System Logs
 router.get('/logs', async (req, res) => {
     try {
-        const limit = parseInt(req.query.limit) || 100;
+        const limit = Math.min(parseInt(req.query.limit) || 100, 500);
         const result = await db.query(
             'SELECT * FROM system_logs ORDER BY created_at DESC LIMIT $1',
             [limit]
@@ -18,8 +21,6 @@ router.get('/logs', async (req, res) => {
         res.status(500).json({ error: 'Failed to fetch logs' });
     }
 });
-
-router.use(verifyAdmin);
 
 router.post('/config', async (req, res) => {
     const { key, value } = req.body;

@@ -42,7 +42,7 @@ router.post('/apple', async (req, res) => {
         res.json({ token, user: { id: userId, appleUserId } });
     } catch (error) {
         console.error('Apple Auth Error (Full Context):', error.message);
-        res.status(500).json({ error: `Authentication Failed: ${error.message}` });
+        res.status(500).json({ error: 'Authentication failed' });
     }
 });
 
@@ -74,19 +74,31 @@ router.post('/subscription/verify', async (req, res) => {
         if (bodyProductId && PRODUCT_CREDITS[bodyProductId]) {
             const creditAmount = PRODUCT_CREDITS[bodyProductId];
             const { creditLedgerService } = require('../services/credits/ledger');
+
+            // SECURITY: Require a transactionId for deduplication
+            if (!transactionId && !originalTransactionId) {
+                return res.status(400).json({ error: 'Missing transactionId' });
+            }
+            const dedupeKey = transactionId || originalTransactionId;
+
             const client = await db.pool.connect();
 
             try {
                 await client.query('BEGIN');
 
-                // Check for existing processing of this transaction to prevent double counting
-                // We'll trust the ledger's idempotency key if we had one, but unique constraint on receipt might be needed.
-                // For now, check if we've processed this transactionId in ledger metadata (if we stored it) 
-                // OR check existing logic. better: simple check against a 'processed_transactions' table if we had one.
-                // Minimal Approach: Check if we have a ledger entry with this transaction ID in metadata? No column yet.
-                // For now, we assume the client is honest and this call is idempotent via frontend/StoreKit "finishTransaction" loop.
+                // SECURITY: Check if this transaction was already processed (prevents replay attacks)
+                const existingTx = await client.query(
+                    `SELECT id FROM processed_transactions WHERE transaction_id = $1`,
+                    [dedupeKey]
+                );
+                if (existingTx.rows.length > 0) {
+                    await client.query('COMMIT');
+                    client.release();
+                    console.log(`Duplicate transaction ${dedupeKey} for user ${userId} — already processed`);
+                    return res.json({ success: true, creditsAdded: 0, type: 'consumable', duplicate: true });
+                }
 
-                // Update: Enforce Max Credit Limit (2000) for Purchased Pool
+                // Enforce Max Credit Limit (2000) for Purchased Pool
                 const balanceRes = await client.query(
                     'SELECT purchased_remaining FROM credit_balances WHERE user_id = $1 FOR UPDATE',
                     [userId]
@@ -95,14 +107,6 @@ router.post('/subscription/verify', async (req, res) => {
 
                 if (currentPurchased + creditAmount > 2000) {
                     console.warn(`User ${userId} attempted top-up but would exceed 2000 limit (${currentPurchased} + ${creditAmount})`);
-                    // Decide: Reject or Cap?
-                    // Request says "should not be allowed!". 
-                    // Since user ALREADY PAID Apple, we shouldn't just steal it. 
-                    // We should probably fulfill it but warn, OR cap it. 
-                    // But if we return error, frontend might retry.
-                    // Better: Fulfill it because they paid. The limit enforcement is best done at purchase time (frontend), 
-                    // OR we just cap the balance at 2000 effectively wasting their money (bad UX).
-                    // Let's Fulfill for now as safety, but log it.
                 }
 
                 await creditLedgerService.createEntry({
@@ -112,7 +116,14 @@ router.post('/subscription/verify', async (req, res) => {
                     reason: 'purchase'
                 }, client);
 
-                console.log(`💰 Added ${creditAmount} purchased credits for user ${userId}`);
+                // SECURITY: Record this transaction as processed
+                await client.query(
+                    `INSERT INTO processed_transactions (transaction_id, user_id, product_id, credits_granted)
+                     VALUES ($1, $2, $3, $4)`,
+                    [dedupeKey, userId, bodyProductId, creditAmount]
+                );
+
+                console.log(`Added ${creditAmount} purchased credits for user ${userId} (tx: ${dedupeKey})`);
 
                 await client.query('COMMIT');
                 return res.json({ success: true, creditsAdded: creditAmount, type: 'consumable' });
@@ -150,14 +161,11 @@ router.post('/subscription/verify', async (req, res) => {
         const result = await verifySubscription(originalTransactionId, environment, bodyProductId || 'unknown');
         const { creditRefreshService } = require('../services/credits/refresh');
 
-        // Update subscription status (ONLY IF INSERTING NEW or if logic allows - here we limit to INSERT effectively or constrained update)
-        // Actually, since we handled the "existing" cases above, we can proceed to INSERT/UPSERT assuming it's new-ish
-        // BUT wait, what if existingSub was null? Then we proceed.
-
+        // Update subscription status
         await client.query(
             `INSERT INTO subscriptions (user_id, product_id, status, expires_at, auto_renew_status, last_verified_at, original_transaction_id)
              VALUES ($1, $2, $3, to_timestamp($4 / 1000.0), true, NOW(), $5)
-             ON CONFLICT (user_id) 
+             ON CONFLICT (user_id)
              DO UPDATE SET
                 product_id = EXCLUDED.product_id,
                 status = EXCLUDED.status,
@@ -175,7 +183,7 @@ router.post('/subscription/verify', async (req, res) => {
 
             if (isEligible) {
                 await creditRefreshService.refreshWeeklyCredits(userId, 'refresh', client);
-                console.log(`✅ Refreshed credits for user ${userId} via manual verification (Sandbox: ${isSandbox})`);
+                console.log(`Refreshed credits for user ${userId} via manual verification (Sandbox: ${isSandbox})`);
             }
         } else if (result.status === 'expired') {
             await creditRefreshService.forfeitWeeklyCredits(userId, 'expiry', client);

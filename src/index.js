@@ -17,12 +17,46 @@ const { uploadImage } = require('./services/storage');
 
 const upload = multer({ dest: 'uploads/' });
 
+const rateLimit = require('express-rate-limit');
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.static(path.join(__dirname, '../public')));
 
 app.use(express.json());
+
+// Rate limiters
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests, please try again later' }
+});
+
+const verifyLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 5, // 5 verification requests per minute per IP
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many verification requests, please try again later' }
+});
+
+const webhookLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 60, // Apple sends bursts
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
+const adminLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests' }
+});
 
 app.get('/', (req, res) => {
     res.send('Kivo AI Backend is running 🚀');
@@ -31,6 +65,12 @@ app.get('/', (req, res) => {
 app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, '../public/admin.html'));
 });
+
+// Rate limiting on sensitive routes
+app.use('/auth/apple', authLimiter);
+app.use('/auth/subscription/verify', verifyLimiter);
+app.use('/webhooks', webhookLimiter);
+app.use('/admin', adminLimiter);
 
 // Routes
 app.use('/auth', authRoutes);

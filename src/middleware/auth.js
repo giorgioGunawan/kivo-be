@@ -17,10 +17,12 @@ const verifyToken = (req, res, next) => {
 };
 
 const verifyAdmin = (req, res, next) => {
-    // Logic for admin auth (e.g. separate secret or role in JWT)
-    // For MVP/Spec: "Simple password-protected panel"
     const adminPass = req.headers['x-admin-password'];
-    if (adminPass !== (process.env.ADMIN_PASSWORD || 'admin123')) {
+    if (!process.env.ADMIN_PASSWORD) {
+        console.error('CRITICAL: ADMIN_PASSWORD environment variable is not set!');
+        return res.status(500).json({ error: 'Server configuration error' });
+    }
+    if (adminPass !== process.env.ADMIN_PASSWORD) {
         return res.status(401).json({ error: 'Admin Unauthorized' });
     }
     next();

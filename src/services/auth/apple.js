@@ -7,13 +7,6 @@ const appleSignin = require('apple-signin-auth');
  * This ensures the token is valid, not expired, and intended for our app.
  */
 const verifyAppleIdToken = async (identityToken) => {
-    // Development fallback
-    // ALLOW MOCK TOKEN for Admin Panel Testing
-    // (Restored for Admin Simulator usage - Subscription verification is still REAL and SECURE)
-    if (identityToken === 'mock_token') {
-        return { sub: 'mock_apple_user_id', email: 'mock@example.com' };
-    }
-
     try {
         const applePayload = await appleSignin.verifyIdToken(identityToken, {
             // THE APP LOCK: Rejects any token not created for your specific App

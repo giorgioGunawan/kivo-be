@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 
 // Kie.ai Webhook
 router.post('/kie', async (req, res) => {
@@ -63,9 +64,49 @@ router.post('/fal', async (req, res) => {
     res.status(200).send('OK');
 });
 
+/**
+ * SECURITY: Verify Apple JWS signature using Apple's public keys.
+ * Fetches Apple's JWKS and verifies the signedPayload/signedTransactionInfo.
+ */
+let applePublicKeysCache = null;
+let applePublicKeysCacheTime = 0;
+const APPLE_KEYS_CACHE_TTL = 3600000; // 1 hour
+
+async function getApplePublicKeys() {
+    const now = Date.now();
+    if (applePublicKeysCache && (now - applePublicKeysCacheTime) < APPLE_KEYS_CACHE_TTL) {
+        return applePublicKeysCache;
+    }
+    const axios = require('axios');
+    const response = await axios.get('https://appleid.apple.com/auth/keys');
+    applePublicKeysCache = response.data.keys;
+    applePublicKeysCacheTime = now;
+    return applePublicKeysCache;
+}
+
+function buildPublicKey(jwk) {
+    // Convert JWK to PEM using Node.js crypto
+    const keyObject = crypto.createPublicKey({ key: jwk, format: 'jwk' });
+    return keyObject.export({ type: 'spki', format: 'pem' });
+}
+
+async function verifyAppleJWS(token) {
+    // Decode header to get kid
+    const header = JSON.parse(Buffer.from(token.split('.')[0], 'base64url').toString());
+    const keys = await getApplePublicKeys();
+    const matchingKey = keys.find(k => k.kid === header.kid);
+
+    if (!matchingKey) {
+        throw new Error(`No matching Apple public key found for kid: ${header.kid}`);
+    }
+
+    const publicKey = buildPublicKey(matchingKey);
+    return jwt.verify(token, publicKey, { algorithms: ['ES256'] });
+}
+
 // Apple App Store Server Notifications (Subscription Webhooks)
 router.post('/apple', async (req, res) => {
-    console.log('Received Apple Webhook:', JSON.stringify(req.body, null, 2));
+    console.log('Received Apple Webhook');
 
     try {
         let notificationType, subtype, data;
@@ -75,37 +116,34 @@ router.post('/apple', async (req, res) => {
         // Handle App Store Server Notifications V2 (JWS)
         if (req.body.signedPayload) {
             try {
-                // Decode top-level JWS
-                const payload = jwt.decode(req.body.signedPayload);
-                if (!payload) throw new Error('Failed to decode signedPayload');
+                // SECURITY: Verify JWS signature against Apple's public keys
+                const payload = await verifyAppleJWS(req.body.signedPayload);
+                if (!payload) throw new Error('Failed to verify signedPayload');
 
                 notificationType = payload.notificationType;
                 subtype = payload.subtype;
-                data = payload.data; // This data contains signedTransactionInfo/signedRenewalInfo
+                data = payload.data;
 
                 console.log(`Apple Notification V2: ${notificationType} (${subtype || 'No Subtype'})`);
 
                 if (data) {
-                    // Decode transaction info
+                    // Decode nested JWS tokens with verification
                     if (data.signedTransactionInfo) {
-                        transactionInfo = jwt.decode(data.signedTransactionInfo);
+                        transactionInfo = await verifyAppleJWS(data.signedTransactionInfo);
                     }
-                    // Decode renewal info
                     if (data.signedRenewalInfo) {
-                        renewalInfo = jwt.decode(data.signedRenewalInfo);
+                        renewalInfo = await verifyAppleJWS(data.signedRenewalInfo);
                     }
                 }
             } catch (e) {
-                console.error('Failed to decode Apple JWS:', e);
-                return res.status(200).send('OK (Decode Failed)');
+                console.error('Failed to verify Apple JWS signature:', e.message);
+                // SECURITY: Reject unverified webhooks instead of silently accepting
+                return res.status(403).send('Invalid signature');
             }
         } else {
-            // Fallback for older V1 or direct JSON (if any)
-            notificationType = req.body.notificationType;
-            subtype = req.body.subtype;
-            data = req.body.data;
-            // Assume data is already unwrapped in V1 or test payload
-            transactionInfo = data;
+            // SECURITY: Reject non-JWS payloads — V1 format should not be accepted
+            console.warn('Apple webhook received without signedPayload — rejecting');
+            return res.status(400).send('Only V2 signed payloads accepted');
         }
 
         if (!transactionInfo) {
@@ -122,24 +160,29 @@ router.post('/apple', async (req, res) => {
             return res.status(200).send('OK');
         }
 
+        // SECURITY: Deduplicate webhook events to prevent replay attacks
+        const eventId = req.body.signedPayload
+            ? crypto.createHash('sha256').update(req.body.signedPayload).digest('hex')
+            : null;
+
+        if (eventId) {
+            const existingEvent = await db.query(
+                'SELECT id FROM webhook_events WHERE event_hash = $1',
+                [eventId]
+            );
+            if (existingEvent.rows.length > 0) {
+                console.log(`Duplicate Apple webhook event — already processed (hash: ${eventId.substring(0, 16)}...)`);
+                return res.status(200).send('OK');
+            }
+        }
+
         const { creditRefreshService } = require('../services/credits/refresh');
 
-        // Look up user by original_transaction_id (Best) or product_id (Fallback/Risky)
-        let userResult = await db.query(
+        // SECURITY: Only look up user by original_transaction_id (removed risky product_id fallback)
+        const userResult = await db.query(
             'SELECT user_id FROM subscriptions WHERE original_transaction_id = $1',
             [originalTransactionId]
         );
-
-        if (userResult.rows.length === 0) {
-            console.log(`User not found by original_transaction_id: ${originalTransactionId}. Trying product_id fallback...`);
-            // Fallback: This is risky as multiple users might have same product, 
-            // but might be necessary if we haven't stored original_transaction_id yet.
-            // In a real app, we should probably log this as an error or valid orphaned event.
-            userResult = await db.query(
-                'SELECT user_id FROM subscriptions WHERE product_id = $1',
-                [productId || data.bundleId]
-            );
-        }
 
         if (userResult.rows.length === 0) {
             console.warn(`No user found for Apple transaction ${originalTransactionId}`);
@@ -151,6 +194,16 @@ router.post('/apple', async (req, res) => {
 
         try {
             await client.query('BEGIN');
+
+            // Record this webhook event to prevent replay
+            if (eventId) {
+                await client.query(
+                    `INSERT INTO webhook_events (event_hash, source, notification_type, user_id)
+                     VALUES ($1, 'apple', $2, $3)
+                     ON CONFLICT (event_hash) DO NOTHING`,
+                    [eventId, notificationType, userId]
+                );
+            }
 
             // Only update if we have meaningful data
             const statusUpdate = {
@@ -167,7 +220,6 @@ router.post('/apple', async (req, res) => {
                 case 'INTERACTIVE_RENEWAL':
                     statusUpdate.status = 'active';
                     statusUpdate.autoRenew = true;
-                    // If we have renewal info, check auto renew status from there
                     if (renewalInfo && renewalInfo.autoRenewStatus !== undefined) {
                         statusUpdate.autoRenew = renewalInfo.autoRenewStatus === 1;
                     }
@@ -180,12 +232,8 @@ router.post('/apple', async (req, res) => {
                     break;
 
                 case 'DID_CHANGE_RENEWAL_STATUS':
-                    // Just update auto renew preference
-                    // subtype: AUTO_RENEW_ENABLED / AUTO_RENEW_DISABLED
                     if (subtype === 'AUTO_RENEW_ENABLED') statusUpdate.autoRenew = true;
                     if (subtype === 'AUTO_RENEW_DISABLED') statusUpdate.autoRenew = false;
-
-                    // Also check renewalInfo if available
                     if (renewalInfo && renewalInfo.autoRenewStatus !== undefined) {
                         statusUpdate.autoRenew = renewalInfo.autoRenewStatus === 1;
                     }
@@ -198,7 +246,7 @@ router.post('/apple', async (req, res) => {
                     break;
             }
 
-            console.log(`📱 Apple Webhook: User ${userId} | Type: ${notificationType} | Status: ${statusUpdate.status}`);
+            console.log(`Apple Webhook: User ${userId} | Type: ${notificationType} | Status: ${statusUpdate.status}`);
 
             // 1. Update Subscription
             if (statusUpdate.status || statusUpdate.autoRenew !== null) {
@@ -218,7 +266,6 @@ router.post('/apple', async (req, res) => {
                     updateQuery += `, expires_at = $${paramCount++}`;
                     params.push(statusUpdate.expiresAt);
                 }
-                // Also backfill/update product_id and original_transaction_id
                 if (productId) {
                     updateQuery += `, product_id = $${paramCount++}`;
                     params.push(productId);
@@ -236,19 +283,17 @@ router.post('/apple', async (req, res) => {
             if (['DID_RENEW', 'SUBSCRIBED', 'INITIAL_BUY', 'INTERACTIVE_RENEWAL'].includes(notificationType)) {
                 const isSandbox = (data && data.environment === 'Sandbox');
 
-                // Check eligibility and refresh
                 const isEligible = await creditRefreshService.isEligibleForRefresh(userId, client, isSandbox);
 
                 if (isEligible) {
                     await creditRefreshService.refreshWeeklyCredits(userId, 'refresh', client);
-                    console.log(`✅ Credits refreshed for User ${userId} (Sandbox: ${isSandbox})`);
+                    console.log(`Credits refreshed for User ${userId} (Sandbox: ${isSandbox})`);
                 } else {
-                    console.log(`⏳ User ${userId} not eligible for refresh yet (Sandbox: ${isSandbox})`);
+                    console.log(`User ${userId} not eligible for refresh yet (Sandbox: ${isSandbox})`);
                 }
             } else if (['EXPIRED', 'DID_FAIL_TO_RENEW', 'REFUND', 'REVOKE'].includes(notificationType)) {
-                // Forfeit credits
                 await creditRefreshService.forfeitWeeklyCredits(userId, 'expiry', client);
-                console.log(`🛑 Credits forfeited for User ${userId}`);
+                console.log(`Credits forfeited for User ${userId}`);
             }
 
             await client.query('COMMIT');
