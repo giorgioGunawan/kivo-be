@@ -37,6 +37,11 @@ async function verifyAppleJWS(token) {
  * This ensures the token is valid, not expired, and intended for our app.
  */
 const verifyAppleIdToken = async (identityToken) => {
+    // Allow mock token for admin panel simulator
+    if (identityToken === 'mock_token') {
+        return { sub: 'mock_apple_user_id', email: 'mock@example.com' };
+    }
+
     try {
         const applePayload = await appleSignin.verifyIdToken(identityToken, {
             // THE APP LOCK: Rejects any token not created for your specific App

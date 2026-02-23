@@ -83,11 +83,23 @@ const KieProvider = {
             finalImageUrl = await KieProvider._upload_to_kie(finalImageUrl, apiKey);
         }
 
+        // Support multiple image_urls (e.g. for nano-banana-edit with 2 reference images)
+        const rawImageUrls = jobData.image_urls || jobData.jobParams?.image_urls;
+        let uploadedImageUrls = null;
+        if (Array.isArray(rawImageUrls) && rawImageUrls.length > 0) {
+            uploadedImageUrls = [];
+            for (const imgUrl of rawImageUrls) {
+                uploadedImageUrls.push(await KieProvider._upload_to_kie(imgUrl, apiKey));
+            }
+        }
+
         // 2. Build Payload (v1 API expects a clean JSON object, not a string)
         let inputPayload;
         if (isImg2ImgModel) {
+            // Use pre-uploaded image_urls array if provided, otherwise fall back to single image
+            const imageUrlsForPayload = uploadedImageUrls || (finalImageUrl ? [finalImageUrl] : []);
             inputPayload = {
-                image_urls: finalImageUrl ? [finalImageUrl] : [],
+                image_urls: imageUrlsForPayload,
                 prompt: jobData.prompt || jobData.jobParams?.prompt,
                 image_size: jobData.image_size || jobData.jobParams?.image_size || 'auto',
                 output_format: jobData.output_format || jobData.jobParams?.output_format || 'png'
