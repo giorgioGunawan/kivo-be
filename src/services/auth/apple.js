@@ -43,7 +43,14 @@ const verifyAppleIdToken = async (identityToken) => {
     }
 
     try {
-        const applePayload = await appleSignin.verifyIdToken(identityToken, {
+        // Sanitize token: trim whitespace/newlines that iOS sometimes adds
+        const cleanToken = identityToken.trim();
+
+        // Debug: log token shape to help diagnose malformed tokens
+        const parts = cleanToken.split('.');
+        console.log(`[Apple Auth] Token parts: ${parts.length}, lengths: [${parts.map(p => p.length).join(', ')}]`);
+
+        const applePayload = await appleSignin.verifyIdToken(cleanToken, {
             // THE APP LOCK: Rejects any token not created for your specific App
             audience: 'com.giorgiogunawan.kivoai',
             ignoreExpiration: false, // Security: Ensure token is fresh
@@ -53,6 +60,7 @@ const verifyAppleIdToken = async (identityToken) => {
         return applePayload;
     } catch (err) {
         console.error('Apple Token Verification Failed:', err.message);
+        console.error('Token preview:', identityToken?.substring(0, 50) + '...');
         throw new Error('Invalid Apple Identity Token');
     }
 };
