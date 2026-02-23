@@ -82,6 +82,10 @@ app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, '../public/admin.html'));
 });
 
+app.get('/boxscore', (req, res) => {
+    res.sendFile(path.join(__dirname, '../public/boxscore.html'));
+});
+
 // Rate limiting on sensitive routes
 app.use('/auth/apple', authLimiter);
 app.use('/auth/subscription/verify', verifyLimiter);

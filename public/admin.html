@@ -145,10 +145,6 @@
             display: grid;
         }
 
-        #nanoEditPane.active {
-            display: block;
-        }
-
         #simulatorPane {
             grid-template-columns: minmax(300px, 380px) 1fr;
             gap: 24px;
@@ -375,7 +371,6 @@
 
         <div class="tabs">
             <div class="tab active" onclick="switchTab('simulator')">Simulator & Logs</div>
-            <div class="tab" onclick="switchTab('nanoEdit')">Nano Edit</div>
             <div class="tab" onclick="switchTab('queue')">Job Queue</div>
             <div class="tab" onclick="switchTab('database')">Database Browser</div>
             <div class="tab" onclick="switchTab('support')">Support</div>
@@ -437,61 +432,6 @@
                 </div>
                 <div id="output">
                     <div style="color: #64748b; font-style: italic;">Wait for activity...</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Nano Edit Pane -->
-        <div id="nanoEditPane" class="pane">
-            <div style="display: grid; grid-template-columns: minmax(300px, 420px) 1fr; gap: 24px;">
-                <div class="sidebar">
-                    <div class="card" style="margin-bottom: 24px;">
-                        <div class="card-header">
-                            <h3>Nano Banana Edit</h3>
-                        </div>
-                        <p style="font-size: 13px; color: var(--text-muted); margin-top: 0;">Upload 2 images and reorder them. Photo 1 and Photo 2 are sent in array order to the API.</p>
-
-                        <label>Image 1</label>
-                        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-                            <input type="text" id="nanoImg1Url" placeholder="https://..." style="margin-bottom:0" />
-                            <input type="file" id="nanoImg1File" accept="image/*" style="display:none" onchange="uploadNanoImage(1)" />
-                            <button class="secondary" onclick="document.getElementById('nanoImg1File').click()" style="padding:0 15px; white-space:nowrap">Upload</button>
-                        </div>
-                        <div id="nanoImg1Preview" style="margin-bottom: 16px;"></div>
-
-                        <label>Image 2</label>
-                        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-                            <input type="text" id="nanoImg2Url" placeholder="https://..." style="margin-bottom:0" />
-                            <input type="file" id="nanoImg2File" accept="image/*" style="display:none" onchange="uploadNanoImage(2)" />
-                            <button class="secondary" onclick="document.getElementById('nanoImg2File').click()" style="padding:0 15px; white-space:nowrap">Upload</button>
-                        </div>
-                        <div id="nanoImg2Preview" style="margin-bottom: 16px;"></div>
-
-                        <!-- Reorder UI -->
-                        <div id="nanoReorderContainer" style="display:none; margin-bottom: 20px;">
-                            <label>Image Order (drag to reorder)</label>
-                            <div id="nanoImageList" style="display: flex; flex-direction: column; gap: 8px;">
-                            </div>
-                        </div>
-
-                        <label>Prompt</label>
-                        <textarea id="nanoPrompt" rows="3" placeholder="Describe the edit...">Merge these two images</textarea>
-
-                        <button onclick="submitNanoEdit()" style="width:100%; margin-top: 8px;">Run Nano Banana Edit</button>
-                        <div id="nanoPolling" style="display:none; margin-top:10px; font-size:12px; color:var(--primary); font-weight:600;">
-                            Polling for result...
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card logs-container">
-                    <div class="card-header">
-                        <h3>Results</h3>
-                        <button class="secondary" style="padding: 5px 15px; font-size: 12px;" onclick="document.getElementById('nanoOutput').innerHTML = '<div style=\'color: #64748b; font-style: italic;\'>No results yet</div>'">Clear</button>
-                    </div>
-                    <div id="nanoOutput" style="flex-grow:1; overflow-y:auto; background:#f8fafc; border:1px solid var(--border); border-radius:8px; padding:16px;">
-                        <div style="color: #64748b; font-style: italic;">No results yet</div>
-                    </div>
                 </div>
             </div>
         </div>
@@ -701,11 +641,10 @@
             // Better: Find tab by index or attribute. Simple way:
             const tabs = document.querySelectorAll('.tab');
             if (tabId === 'simulator') tabs[0].classList.add('active');
-            if (tabId === 'nanoEdit') tabs[1].classList.add('active');
-            if (tabId === 'queue') tabs[2].classList.add('active');
-            if (tabId === 'database') tabs[3].classList.add('active');
-            if (tabId === 'support') tabs[4].classList.add('active');
-            if (tabId === 'systemLogs') tabs[5].classList.add('active');
+            if (tabId === 'queue') tabs[1].classList.add('active');
+            if (tabId === 'database') tabs[2].classList.add('active');
+            if (tabId === 'support') tabs[3].classList.add('active');
+            if (tabId === 'systemLogs') tabs[4].classList.add('active');
 
             const pane = document.getElementById(`${tabId}Pane`);
             if (pane) pane.classList.add('active');
@@ -1320,217 +1259,6 @@
 
         function clearLogs() {
             document.getElementById('output').innerHTML = '<div style="color: #64748b; font-style: italic;">Wait for activity...</div>';
-        }
-
-        // --- Nano Banana Edit Logic ---
-        let nanoImages = [null, null]; // [url1, url2]
-
-        async function uploadNanoImage(slot) {
-            const fileInput = document.getElementById(`nanoImg${slot}File`);
-            const file = fileInput.files[0];
-            if (!file) return;
-
-            const formData = new FormData();
-            formData.append('image', file);
-
-            const urlInput = document.getElementById(`nanoImg${slot}Url`);
-            urlInput.value = 'Uploading...';
-
-            try {
-                const res = await fetch(`${API_URL}/admin/upload`, {
-                    method: 'POST',
-                    headers: { 'x-admin-password': adminPassword },
-                    body: formData
-                });
-                const data = await res.json();
-                if (data.url) {
-                    urlInput.value = data.url;
-                    nanoImages[slot - 1] = data.url;
-                    updateNanoPreview(slot, data.url);
-                    updateNanoReorder();
-                } else {
-                    urlInput.value = '';
-                    nanoLogEntry('Upload failed', true);
-                }
-            } catch (e) {
-                urlInput.value = '';
-                nanoLogEntry('Upload error: ' + e.message, true);
-            }
-        }
-
-        // Watch URL inputs for manual entry
-        document.addEventListener('DOMContentLoaded', () => {
-            for (let i = 1; i <= 2; i++) {
-                const input = document.getElementById(`nanoImg${i}Url`);
-                if (input) {
-                    input.addEventListener('change', () => {
-                        nanoImages[i - 1] = input.value || null;
-                        updateNanoPreview(i, input.value);
-                        updateNanoReorder();
-                    });
-                }
-            }
-        });
-
-        function updateNanoPreview(slot, url) {
-            const container = document.getElementById(`nanoImg${slot}Preview`);
-            if (url) {
-                container.innerHTML = `<img src="${url}" style="width:100%; max-width:200px; border-radius:8px; border:1px solid var(--border);" />`;
-            } else {
-                container.innerHTML = '';
-            }
-        }
-
-        function updateNanoReorder() {
-            const container = document.getElementById('nanoReorderContainer');
-            const list = document.getElementById('nanoImageList');
-
-            // Read current URLs from inputs (in case user typed manually)
-            nanoImages[0] = document.getElementById('nanoImg1Url').value || null;
-            nanoImages[1] = document.getElementById('nanoImg2Url').value || null;
-
-            const hasImages = nanoImages.filter(Boolean).length >= 2;
-            container.style.display = hasImages ? 'block' : 'none';
-            if (!hasImages) return;
-
-            list.innerHTML = nanoImages.map((url, idx) => {
-                if (!url) return '';
-                return `
-                    <div draggable="true" data-idx="${idx}"
-                         ondragstart="nanoDragStart(event)" ondragover="nanoDragOver(event)" ondrop="nanoDrop(event)"
-                         style="display:flex; align-items:center; gap:12px; padding:10px; background:white; border:1px solid var(--border); border-radius:8px; cursor:grab;">
-                        <span style="font-weight:700; color:var(--primary); min-width:24px;">P${idx + 1}</span>
-                        <img src="${url}" style="width:48px; height:48px; object-fit:cover; border-radius:6px; border:1px solid var(--border);" />
-                        <span style="font-size:11px; color:var(--text-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;">${url.split('/').pop()}</span>
-                        <button class="secondary" style="padding:4px 10px; font-size:11px;" onclick="swapNanoImages()">Swap</button>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        let nanoDragIdx = null;
-        function nanoDragStart(e) { nanoDragIdx = parseInt(e.target.closest('[data-idx]').dataset.idx); }
-        function nanoDragOver(e) { e.preventDefault(); }
-        function nanoDrop(e) {
-            e.preventDefault();
-            const dropIdx = parseInt(e.target.closest('[data-idx]').dataset.idx);
-            if (nanoDragIdx !== null && nanoDragIdx !== dropIdx) {
-                swapNanoImages();
-            }
-            nanoDragIdx = null;
-        }
-
-        function swapNanoImages() {
-            const tmp = nanoImages[0];
-            nanoImages[0] = nanoImages[1];
-            nanoImages[1] = tmp;
-
-            document.getElementById('nanoImg1Url').value = nanoImages[0] || '';
-            document.getElementById('nanoImg2Url').value = nanoImages[1] || '';
-            updateNanoPreview(1, nanoImages[0]);
-            updateNanoPreview(2, nanoImages[1]);
-            updateNanoReorder();
-        }
-
-        async function submitNanoEdit() {
-            // Read from inputs directly
-            nanoImages[0] = document.getElementById('nanoImg1Url').value || null;
-            nanoImages[1] = document.getElementById('nanoImg2Url').value || null;
-
-            const urls = nanoImages.filter(Boolean);
-            if (urls.length < 2) {
-                alert('Please upload or provide 2 images.');
-                return;
-            }
-
-            const token = document.getElementById('userToken').value;
-            if (!token) {
-                alert('Please login as mock user first (Simulator tab).');
-                return;
-            }
-
-            const prompt = document.getElementById('nanoPrompt').value;
-
-            nanoLogEntry('Submitting Nano Banana Edit...');
-
-            try {
-                const res = await fetch(`${API_URL}/jobs`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`,
-                        'Idempotency-Key': crypto.randomUUID()
-                    },
-                    body: JSON.stringify({
-                        media_type: 'image',
-                        model: 'google/nano-banana-edit',
-                        prompt: prompt,
-                        image_urls: urls
-                    })
-                });
-
-                const data = await res.json();
-                if (res.status >= 400) {
-                    nanoLogEntry('Request failed: ' + (data.error || JSON.stringify(data)), true);
-                    return;
-                }
-
-                nanoLogEntry('Job queued: ' + data.jobId);
-
-                if (data.jobId) {
-                    startNanoPolling(data.jobId, token);
-                }
-            } catch (e) {
-                nanoLogEntry('Error: ' + e.message, true);
-            }
-        }
-
-        async function startNanoPolling(jobId, token) {
-            const indicator = document.getElementById('nanoPolling');
-            indicator.style.display = 'block';
-            let attempts = 0;
-
-            const poll = setInterval(async () => {
-                attempts++;
-                if (attempts > 60) {
-                    clearInterval(poll);
-                    indicator.style.display = 'none';
-                    nanoLogEntry('Polling timed out after 2 minutes', true);
-                    return;
-                }
-
-                try {
-                    const res = await fetch(`${API_URL}/jobs/${jobId}`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    const data = await res.json();
-
-                    if (data.status === 'completed') {
-                        clearInterval(poll);
-                        indicator.style.display = 'none';
-                        nanoLogEntry('Generation complete!');
-                        if (data.result_url) {
-                            const output = document.getElementById('nanoOutput');
-                            const img = document.createElement('img');
-                            img.src = data.result_url;
-                            img.style.cssText = 'width:100%; max-width:600px; border-radius:12px; border:1px solid var(--border); box-shadow:var(--shadow-lg); margin-top:12px;';
-                            output.prepend(img);
-                        }
-                    } else if (data.status === 'failed') {
-                        clearInterval(poll);
-                        indicator.style.display = 'none';
-                        nanoLogEntry('Job failed: ' + (data.error || 'Unknown error'), true);
-                    }
-                } catch (e) { /* ignore transient */ }
-            }, 3000);
-        }
-
-        function nanoLogEntry(msg, isError = false) {
-            const output = document.getElementById('nanoOutput');
-            const entry = document.createElement('div');
-            entry.style.cssText = `margin-bottom:12px; padding:10px; border-radius:8px; font-size:13px; font-weight:600; background:${isError ? '#fef2f2' : '#f0fdf4'}; color:${isError ? '#ef4444' : '#166534'}; border:1px solid ${isError ? '#fee2e2' : '#bbf7d0'};`;
-            entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-            output.prepend(entry);
         }
 
         async function uploadFile() {
