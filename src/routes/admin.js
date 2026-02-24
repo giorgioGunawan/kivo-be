@@ -216,4 +216,41 @@ router.get('/support/users', async (req, res) => {
     }
 });
 
+// Reference Photos Library
+router.get('/reference-photos', async (req, res) => {
+    try {
+        const result = await db.query('SELECT * FROM reference_photos ORDER BY created_at DESC');
+        res.json(result.rows);
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Failed to fetch reference photos' });
+    }
+});
+
+router.post('/reference-photos', async (req, res) => {
+    const { url, label } = req.body;
+    if (!url) return res.status(400).json({ error: 'URL is required' });
+    try {
+        const result = await db.query(
+            'INSERT INTO reference_photos (url, label) VALUES ($1, $2) RETURNING *',
+            [url, label]
+        );
+        res.json(result.rows[0]);
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Failed to save reference photo' });
+    }
+});
+
+router.delete('/reference-photos/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        await db.query('DELETE FROM reference_photos WHERE id = $1', [id]);
+        res.json({ success: true });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ error: 'Failed to delete reference photo' });
+    }
+});
+
 module.exports = router;

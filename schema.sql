@@ -97,6 +97,14 @@ CREATE TABLE IF NOT EXISTS webhook_events (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Reference Photos Library
+CREATE TABLE IF NOT EXISTS reference_photos (
+    id SERIAL PRIMARY KEY,
+    url TEXT NOT NULL,
+    label VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_credit_ledger_user_id ON credit_ledger(user_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_user_id ON jobs(user_id);
@@ -104,3 +112,4 @@ CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
 CREATE INDEX IF NOT EXISTS idx_processed_transactions_tx_id ON processed_transactions(transaction_id);
 CREATE INDEX IF NOT EXISTS idx_processed_transactions_user_id ON processed_transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_webhook_events_hash ON webhook_events(event_hash);
+CREATE INDEX IF NOT EXISTS idx_reference_photos_label ON reference_photos(label);

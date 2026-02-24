@@ -21,7 +21,10 @@
             --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
         }
 
-        * { box-sizing: border-box; font-family: 'Inter', -apple-system, sans-serif; }
+        * {
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, sans-serif;
+        }
 
         body {
             background-color: var(--bg);
@@ -53,8 +56,16 @@
             text-align: center;
         }
 
-        .login-card h1 { margin-bottom: 8px; font-size: 24px; font-weight: 700; }
-        .login-card p { color: var(--text-muted); margin-bottom: 24px; }
+        .login-card h1 {
+            margin-bottom: 8px;
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .login-card p {
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
 
         #mainApp {
             display: none;
@@ -70,7 +81,11 @@
             margin-bottom: 32px;
         }
 
-        .logo { font-size: 24px; font-weight: 800; color: var(--primary); }
+        .logo {
+            font-size: 24px;
+            font-weight: 800;
+            color: var(--primary);
+        }
 
         .card {
             background: white;
@@ -87,7 +102,11 @@
             align-items: center;
         }
 
-        .card-header h3 { margin: 0; font-size: 18px; font-weight: 700; }
+        .card-header h3 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 700;
+        }
 
         label {
             display: block;
@@ -97,7 +116,9 @@
             color: var(--text-muted);
         }
 
-        input, select, textarea {
+        input,
+        select,
+        textarea {
             width: 100%;
             padding: 10px 14px;
             border-radius: 8px;
@@ -108,7 +129,10 @@
             font-size: 14px;
         }
 
-        input:focus, textarea:focus { border-color: var(--primary); }
+        input:focus,
+        textarea:focus {
+            border-color: var(--primary);
+        }
 
         button {
             background: var(--primary);
@@ -121,30 +145,46 @@
             transition: background 0.2s;
         }
 
-        button:hover { background: var(--primary-hover); }
+        button:hover {
+            background: var(--primary-hover);
+        }
 
-        button.secondary { background: #f1f5f9; color: var(--text-main); }
-        button.secondary:hover { background: #e2e8f0; }
+        button.secondary {
+            background: #f1f5f9;
+            color: var(--text-main);
+        }
+
+        button.secondary:hover {
+            background: #e2e8f0;
+        }
 
         .main-grid {
             display: grid;
-            grid-template-columns: minmax(300px, 420px) 1fr;
+            grid-template-columns: 380px 1fr 320px;
             gap: 24px;
+            align-items: start;
         }
 
-        @media (max-width: 900px) {
-            .main-grid { grid-template-columns: 1fr; }
+        @media (max-width: 1100px) {
+            .main-grid {
+                grid-template-columns: 380px 1fr;
+            }
+        }
+
+        @media (max-width: 800px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
         .results-panel {
             display: flex;
             flex-direction: column;
-            height: calc(100vh - 200px);
+            min-height: 400px;
         }
 
         #resultOutput {
             flex-grow: 1;
-            overflow-y: auto;
             background: #f8fafc;
             border: 1px solid var(--border);
             border-radius: 8px;
@@ -159,8 +199,116 @@
             font-weight: 600;
         }
 
-        .log-success { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
-        .log-error { background: #fef2f2; color: #ef4444; border: 1px solid #fee2e2; }
+        .log-success {
+            background: #f0fdf4;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+        }
+
+        .log-error {
+            background: #fef2f2;
+            color: #ef4444;
+            border: 1px solid #fee2e2;
+        }
+
+        /* Library Styles */
+        .library-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+            max-height: 600px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .library-item {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .library-item:hover {
+            border-color: var(--primary);
+            box-shadow: var(--shadow);
+        }
+
+        .library-item img {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+            border-radius: 6px;
+            margin-bottom: 4px;
+        }
+
+        .library-item .label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-main);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .library-item .actions {
+            display: flex;
+            gap: 4px;
+            margin-top: 4px;
+        }
+
+        .library-item .action-btn {
+            font-size: 10px;
+            padding: 2px 6px;
+            background: #f1f5f9;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+        }
+
+        .library-item .delete-btn {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            background: rgba(239, 68, 68, 0.9);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            font-size: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .library-item:hover .delete-btn {
+            opacity: 1;
+        }
+
+        .preview-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-top: 4px;
+            font-weight: 500;
+        }
+
+        .save-lib-btn {
+            background: #f1f5f9;
+            color: var(--text-main);
+            font-size: 11px;
+            padding: 4px 8px;
+            margin-top: 8px;
+            width: auto;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
     </style>
 </head>
 
@@ -171,9 +319,10 @@
             <h1>Boxscore</h1>
             <p>Enter password to access the editor</p>
             <input type="password" id="entryPassword" placeholder="Password" style="text-align:center"
-                   onkeydown="if(event.key==='Enter') checkLogin()" />
+                onkeydown="if(event.key==='Enter') checkLogin()" />
             <button onclick="checkLogin()" style="width:100%">Enter</button>
-            <div id="loginError" style="color:#ef4444; margin-top:10px; font-size:14px; display:none">Incorrect Password</div>
+            <div id="loginError" style="color:#ef4444; margin-top:10px; font-size:14px; display:none">Incorrect Password
+            </div>
         </div>
     </div>
 
@@ -196,18 +345,31 @@
                     <label>Image 1</label>
                     <div style="display: flex; gap: 8px; margin-bottom: 12px;">
                         <input type="text" id="img1Url" placeholder="https://..." style="margin-bottom:0" />
-                        <input type="file" id="img1File" accept="image/*" style="display:none" onchange="uploadImage(1)" />
-                        <button class="secondary" onclick="document.getElementById('img1File').click()" style="padding:0 15px; white-space:nowrap">Upload</button>
+                        <input type="file" id="img1File" accept="image/*" style="display:none"
+                            onchange="uploadImage(1)" />
+                        <button class="secondary" onclick="document.getElementById('img1File').click()"
+                            style="padding:0 15px; white-space:nowrap">Upload</button>
                     </div>
-                    <div id="img1Preview" style="margin-bottom: 16px;"></div>
+                    <div id="img1Preview" style="margin-bottom: 8px;"></div>
+                    <div id="img1Label" class="preview-label" style="display:none; margin-bottom: 8px;"></div>
+                    <div id="img1SaveContainer" style="display:none; margin-bottom: 16px;">
+                        <button class="save-lib-btn" onclick="saveToLibrary(1)">+ Save to Library</button>
+                    </div>
 
                     <label>Image 2</label>
                     <div style="display: flex; gap: 8px; margin-bottom: 12px;">
                         <input type="text" id="img2Url" placeholder="https://..." style="margin-bottom:0" />
-                        <input type="file" id="img2File" accept="image/*" style="display:none" onchange="uploadImage(2)" />
-                        <button class="secondary" onclick="document.getElementById('img2File').click()" style="padding:0 15px; white-space:nowrap">Upload</button>
+                        <input type="file" id="img2File" accept="image/*" style="display:none"
+                            onchange="uploadImage(2)" />
+                        <button class="secondary" onclick="document.getElementById('img2File').click()"
+                            style="padding:0 15px; white-space:nowrap">Upload</button>
                     </div>
-                    <div id="img2Preview" style="margin-bottom: 16px;"></div>
+                    <div id="img2Preview" style="margin-bottom: 8px;"></div>
+                    <div id="img2Label" class="preview-label" style="display:none; margin-bottom: 8px;"></div>
+                    <div id="img2SaveContainer" style="display:none; margin-bottom: 16px;">
+                        <button class="save-lib-btn" onclick="saveToLibrary(2)">+ Save to Library</button>
+                    </div>
+
 
                     <!-- Reorder -->
                     <div id="reorderContainer" style="display:none; margin-bottom: 20px;">
@@ -218,8 +380,10 @@
                     <label>Prompt</label>
                     <textarea id="prompt" rows="3" placeholder="Describe the edit...">Merge these two images</textarea>
 
-                    <button id="submitBtn" onclick="submitEdit()" style="width:100%; margin-top: 8px;">Run Nano Banana Edit</button>
-                    <div id="pollingIndicator" style="display:none; margin-top:10px; font-size:12px; color:var(--primary); font-weight:600;">
+                    <button id="submitBtn" onclick="submitEdit()" style="width:100%; margin-top: 8px;">Run Nano Banana
+                        Edit</button>
+                    <div id="pollingIndicator"
+                        style="display:none; margin-top:10px; font-size:12px; color:var(--primary); font-weight:600;">
                         Polling for result...
                     </div>
                 </div>
@@ -228,10 +392,26 @@
             <div class="card results-panel">
                 <div class="card-header">
                     <h3>Results</h3>
-                    <button class="secondary" style="padding: 5px 15px; font-size: 12px;" onclick="clearResults()">Clear</button>
+                    <button class="secondary" style="padding: 5px 15px; font-size: 12px;"
+                        onclick="clearResults()">Clear</button>
                 </div>
                 <div id="resultOutput">
                     <div style="color: #64748b; font-style: italic;">No results yet</div>
+                </div>
+            </div>
+
+            <!-- Reference Library -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>Library</h3>
+                    <button class="secondary" style="padding: 5px 10px; font-size: 11px;"
+                        onclick="loadLibrary()">Refresh</button>
+                </div>
+                <p style="font-size: 11px; color: var(--text-muted); margin-top: -15px; margin-bottom: 15px;">
+                    Common reference photos.
+                </p>
+                <div id="libraryList" class="library-grid">
+                    <div style="color: #64748b; font-style: italic; font-size: 12px;">Loading library...</div>
                 </div>
             </div>
         </div>
@@ -255,6 +435,7 @@
             document.getElementById('loginOverlay').style.display = 'none';
             document.getElementById('mainApp').style.display = 'block';
             loginMockUser();
+            loadLibrary();
         }
 
         async function loginMockUser() {
@@ -302,6 +483,7 @@
                     urlInput.value = data.url;
                     images[slot - 1] = data.url;
                     updatePreview(slot, data.url);
+                    document.getElementById(`img${slot}SaveContainer`).style.display = 'block';
                     updateReorder();
                 } else {
                     urlInput.value = '';
@@ -316,19 +498,33 @@
         // Watch for manual URL entry
         document.addEventListener('DOMContentLoaded', () => {
             for (let i = 1; i <= 2; i++) {
-                document.getElementById(`img${i}Url`).addEventListener('change', function() {
+                document.getElementById(`img${i}Url`).addEventListener('change', function () {
                     images[i - 1] = this.value || null;
                     updatePreview(i, this.value);
                     updateReorder();
+                    if (this.value) {
+                        document.getElementById(`img${i}SaveContainer`).style.display = 'block';
+                    } else {
+                        document.getElementById(`img${i}SaveContainer`).style.display = 'none';
+                    }
                 });
             }
         });
 
-        function updatePreview(slot, url) {
+        function updatePreview(slot, url, label = '') {
             const el = document.getElementById(`img${slot}Preview`);
+            const labelEl = document.getElementById(`img${slot}Label`);
+
             el.innerHTML = url
                 ? `<img src="${url}" style="width:100%; max-width:200px; border-radius:8px; border:1px solid var(--border);" />`
                 : '';
+
+            if (label) {
+                labelEl.textContent = label;
+                labelEl.style.display = 'block';
+            } else {
+                labelEl.style.display = 'none';
+            }
         }
 
         function updateReorder() {
@@ -474,6 +670,98 @@
 
         function clearResults() {
             document.getElementById('resultOutput').innerHTML = '<div style="color: #64748b; font-style: italic;">No results yet</div>';
+        }
+
+        // --- Library Logic ---
+        async function loadLibrary() {
+            try {
+                const res = await fetch(`${API_URL}/admin/reference-photos`, {
+                    headers: { 'x-admin-password': adminPassword }
+                });
+                const data = await res.json();
+                const list = document.getElementById('libraryList');
+
+                if (data.length === 0) {
+                    list.innerHTML = '<div style="color: #64748b; font-style: italic; font-size: 12px;">Library is empty</div>';
+                    return;
+                }
+
+                list.innerHTML = data.map(item => `
+                    <div class="library-item" onclick="selectFromLibrary('${item.url}', '${item.label || ''}')">
+                        <button class="delete-btn" onclick="event.stopPropagation(); deleteFromLibrary(${item.id})">×</button>
+                        <img src="${item.url}" alt="${item.label}" />
+                        <div class="label">${item.label || 'No Label'}</div>
+                        <div class="actions">
+                            <button class="action-btn" onclick="event.stopPropagation(); useInSlot(1, '${item.url}', '${item.label || ''}')">Slot 1</button>
+                            <button class="action-btn" onclick="event.stopPropagation(); useInSlot(2, '${item.url}', '${item.label || ''}')">Slot 2</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) {
+                console.error('Failed to load library:', e);
+            }
+        }
+
+        async function saveToLibrary(slot) {
+            const url = document.getElementById(`img${slot}Url`).value;
+            if (!url || url === 'Uploading...') return;
+
+            const label = prompt('Enter a label for this photo:');
+            if (label === null) return; // Cancelled
+
+            try {
+                const res = await fetch(`${API_URL}/admin/reference-photos`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-admin-password': adminPassword
+                    },
+                    body: JSON.stringify({ url, label })
+                });
+                const data = await res.json();
+                if (data.id) {
+                    logEntry('Saved to library: ' + (label || 'Photo'));
+                    loadLibrary();
+                    document.getElementById(`img${slot}SaveContainer`).style.display = 'none';
+                    updatePreview(slot, url, label);
+                }
+            } catch (e) {
+                logEntry('Failed to save to library: ' + e.message, true);
+            }
+        }
+
+        async function deleteFromLibrary(id) {
+            if (!confirm('Are you sure you want to delete this from the library?')) return;
+            try {
+                const res = await fetch(`${API_URL}/admin/reference-photos/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'x-admin-password': adminPassword }
+                });
+                if (res.ok) {
+                    loadLibrary();
+                }
+            } catch (e) {
+                logEntry('Failed to delete: ' + e.message, true);
+            }
+        }
+
+        function useInSlot(slot, url, label) {
+            document.getElementById(`img${slot}Url`).value = url;
+            images[slot - 1] = url;
+            updatePreview(slot, url, label);
+            document.getElementById(`img${slot}SaveContainer`).style.display = 'none'; // Already in library or manual select
+            updateReorder();
+        }
+
+        function selectFromLibrary(url, label) {
+            // Default to slot 1 if empty, else slot 2, else slot 1
+            if (!images[0]) {
+                useInSlot(1, url, label);
+            } else if (!images[1]) {
+                useInSlot(2, url, label);
+            } else {
+                useInSlot(1, url, label);
+            }
         }
     </script>
 </body>
