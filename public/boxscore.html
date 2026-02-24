@@ -309,6 +309,44 @@
             align-items: center;
             gap: 4px;
         }
+
+        /* Drop Zone Styles */
+        .drop-zone {
+            border: 2px dashed transparent;
+            border-radius: var(--radius);
+            padding: 12px;
+            transition: all 0.2s;
+            margin: -4px;
+            position: relative;
+        }
+
+        .drop-zone--over {
+            border-color: var(--primary);
+            background: rgba(37, 99, 235, 0.05);
+            transform: scale(1.01);
+        }
+
+        .drop-zone::after {
+            content: 'Drop photo here';
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.9);
+            color: var(--primary);
+            font-size: 13px;
+            font-weight: 600;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s;
+            border-radius: var(--radius);
+            z-index: 10;
+        }
+
+        .drop-zone--over::after {
+            opacity: 1;
+        }
     </style>
 </head>
 
@@ -342,32 +380,38 @@
                         Upload 2 images. Photo 1 and Photo 2 are sent in array order to the API.
                     </p>
 
-                    <label>Image 1</label>
-                    <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-                        <input type="text" id="img1Url" placeholder="https://..." style="margin-bottom:0" />
-                        <input type="file" id="img1File" accept="image/*" style="display:none"
-                            onchange="uploadImage(1)" />
-                        <button class="secondary" onclick="document.getElementById('img1File').click()"
-                            style="padding:0 15px; white-space:nowrap">Upload</button>
-                    </div>
-                    <div id="img1Preview" style="margin-bottom: 8px;"></div>
-                    <div id="img1Label" class="preview-label" style="display:none; margin-bottom: 8px;"></div>
-                    <div id="img1SaveContainer" style="display:none; margin-bottom: 16px;">
-                        <button class="save-lib-btn" onclick="saveToLibrary(1)">+ Save to Library</button>
+                    <div id="dropZone1" class="drop-zone" ondragover="dragOver(event, 1)" ondragleave="dragLeave(1)"
+                        ondrop="handleDrop(event, 1)">
+                        <label>Image 1</label>
+                        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                            <input type="text" id="img1Url" placeholder="https://..." style="margin-bottom:0" />
+                            <input type="file" id="img1File" accept="image/*" style="display:none"
+                                onchange="uploadImage(1)" />
+                            <button class="secondary" onclick="document.getElementById('img1File').click()"
+                                style="padding:0 15px; white-space:nowrap">Upload</button>
+                        </div>
+                        <div id="img1Preview" style="margin-bottom: 8px;"></div>
+                        <div id="img1Label" class="preview-label" style="display:none; margin-bottom: 8px;"></div>
+                        <div id="img1SaveContainer" style="display:none; margin-bottom: 16px;">
+                            <button class="save-lib-btn" onclick="saveToLibrary(1)">+ Save to Library</button>
+                        </div>
                     </div>
 
-                    <label>Image 2</label>
-                    <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-                        <input type="text" id="img2Url" placeholder="https://..." style="margin-bottom:0" />
-                        <input type="file" id="img2File" accept="image/*" style="display:none"
-                            onchange="uploadImage(2)" />
-                        <button class="secondary" onclick="document.getElementById('img2File').click()"
-                            style="padding:0 15px; white-space:nowrap">Upload</button>
-                    </div>
-                    <div id="img2Preview" style="margin-bottom: 8px;"></div>
-                    <div id="img2Label" class="preview-label" style="display:none; margin-bottom: 8px;"></div>
-                    <div id="img2SaveContainer" style="display:none; margin-bottom: 16px;">
-                        <button class="save-lib-btn" onclick="saveToLibrary(2)">+ Save to Library</button>
+                    <div id="dropZone2" class="drop-zone" ondragover="dragOver(event, 2)" ondragleave="dragLeave(2)"
+                        ondrop="handleDrop(event, 2)">
+                        <label>Image 2</label>
+                        <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                            <input type="text" id="img2Url" placeholder="https://..." style="margin-bottom:0" />
+                            <input type="file" id="img2File" accept="image/*" style="display:none"
+                                onchange="uploadImage(2)" />
+                            <button class="secondary" onclick="document.getElementById('img2File').click()"
+                                style="padding:0 15px; white-space:nowrap">Upload</button>
+                        </div>
+                        <div id="img2Preview" style="margin-bottom: 8px;"></div>
+                        <div id="img2Label" class="preview-label" style="display:none; margin-bottom: 8px;"></div>
+                        <div id="img2SaveContainer" style="display:none; margin-bottom: 16px;">
+                            <button class="save-lib-btn" onclick="saveToLibrary(2)">+ Save to Library</button>
+                        </div>
                     </div>
 
 
@@ -461,9 +505,50 @@
         }
 
         // --- Image Upload ---
-        async function uploadImage(slot) {
-            const fileInput = document.getElementById(`img${slot}File`);
-            const file = fileInput.files[0];
+        function dragOver(e, slot) {
+            e.preventDefault();
+            document.getElementById(`dropZone${slot}`).classList.add('drop-zone--over');
+        }
+
+        function dragLeave(slot) {
+            document.getElementById(`dropZone${slot}`).classList.remove('drop-zone--over');
+        }
+
+        function handleDrop(e, slot) {
+            e.preventDefault();
+            dragLeave(slot);
+
+            // Handle library item drop
+            const libData = e.dataTransfer.getData('text/plain');
+            if (libData) {
+                try {
+                    const data = JSON.parse(libData);
+                    if (data.type === 'library') {
+                        useInSlot(slot, data.url, data.label);
+                        return;
+                    }
+                } catch (err) {
+                    // Not library data, continue to files
+                }
+            }
+
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                uploadImage(slot, files[0]);
+            }
+        }
+
+        function libDragStart(e, url, label) {
+            e.dataTransfer.setData('text/plain', JSON.stringify({ url, label, type: 'library' }));
+            e.dataTransfer.dropEffect = 'copy';
+        }
+
+        async function uploadImage(slot, providedFile = null) {
+            let file = providedFile;
+            if (!file) {
+                const fileInput = document.getElementById(`img${slot}File`);
+                file = fileInput.files[0];
+            }
             if (!file) return;
 
             const formData = new FormData();
@@ -687,7 +772,10 @@
                 }
 
                 list.innerHTML = data.map(item => `
-                    <div class="library-item" onclick="selectFromLibrary('${item.url}', '${item.label || ''}')">
+                    <div class="library-item" 
+                         draggable="true" 
+                         ondragstart="libDragStart(event, '${item.url}', '${item.label || ''}')"
+                         onclick="selectFromLibrary('${item.url}', '${item.label || ''}')">
                         <button class="delete-btn" onclick="event.stopPropagation(); deleteFromLibrary(${item.id})">×</button>
                         <img src="${item.url}" alt="${item.label}" />
                         <div class="label">${item.label || 'No Label'}</div>
