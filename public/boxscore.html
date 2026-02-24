@@ -377,7 +377,7 @@
                         <h3>Nano Banana Edit</h3>
                     </div>
                     <p style="font-size: 13px; color: var(--text-muted); margin-top: 0;">
-                        Upload 2 images. Photo 1 and Photo 2 are sent in array order to the API.
+                        Upload 1 or 2 images.
                     </p>
 
                     <div id="dropZone1" class="drop-zone" ondragover="dragOver(event, 1)" ondragleave="dragLeave(1)"
@@ -662,7 +662,7 @@
             images[1] = document.getElementById('img2Url').value || null;
 
             const urls = images.filter(Boolean);
-            if (urls.length < 2) { alert('Please upload or provide 2 images.'); return; }
+            if (urls.length === 0) { alert('Please upload or provide at least 1 image.'); return; }
             if (!userToken) { alert('Not logged in. Please refresh the page.'); return; }
 
             const prompt = document.getElementById('prompt').value;
